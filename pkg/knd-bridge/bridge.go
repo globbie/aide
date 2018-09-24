@@ -3,6 +3,7 @@ package bridge
 // #cgo CFLAGS: -I${SRCDIR}/knowdy/core/include
 // #cgo CFLAGS: -I${SRCDIR}/knowdy/libs/gsl-parser/include
 // #cgo LDFLAGS: ${SRCDIR}/knowdy/build/lib/libcore_static.a
+// #cgo LDFLAGS: ${SRCDIR}/knowdy/build/lib/libglb-lib_static.a
 // #include <knd_shard.h>
 import "C"
 import "unsafe"
