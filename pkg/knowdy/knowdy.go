@@ -13,10 +13,9 @@ package knowdy
 //     }
 // }
 import "C"
-
-//import "unsafe"
 import (
 	"errors"
+	"unsafe"
 )
 
 type Shard struct {
@@ -42,8 +41,12 @@ func (s *Shard) Del() error {
 }
 
 func (s *Shard) RunTask(task string) (string, error) {
-	a := "asdfasdf"
-	_ = len(a)
-	return "", nil
+	var outbuf [4096]byte
+	var outlen C.size_t
+	errCode := C.kndShard_run_task(s.shard, C.CString(task), C.size_t(len(task)), (*C.char)(unsafe.Pointer(&outbuf)), (*C.size_t)(unsafe.Pointer(&outlen)))
+	if errCode != C.int(0) {
+		return "", errors.New("could not create shard struct")
+	}
+	return string(outbuf[:outlen]), nil
 }
 

@@ -1,6 +1,9 @@
 package knowdy
 
-import "testing"
+import (
+	"log"
+	"testing"
+)
 
 const shardCfg = `
 {schema knd
@@ -24,5 +27,10 @@ func TestShard(t *testing.T) {
 	if err != nil {
 		t.Error(err)
 	}
+	result, err := shard.RunTask("{task {tid 123}}")
+	if err != nil {
+		t.Error(err)
+	}
+	log.Println(result)
 	defer shard.Del()
 }
