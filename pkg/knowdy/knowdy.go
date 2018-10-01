@@ -1,4 +1,4 @@
-package knowdy 
+package knowdy
 
 // #cgo CFLAGS: -I${SRCDIR}/knowdy/core/include
 // #cgo CFLAGS: -I${SRCDIR}/knowdy/libs/gsl-parser/include
@@ -9,7 +9,7 @@ package knowdy
 // static void kndShard_del__(struct kndShard *shard)
 // {
 //     if (shard) {
-//         shard->del(shard);
+//         kndShard_del(shard);
 //     }
 // }
 import "C"
@@ -25,6 +25,7 @@ type Shard struct {
 
 func New(conf string) (*Shard, error) {
 	var shard *C.struct_kndShard = nil
+
 	errCode := C.kndShard_new(&shard, C.CString(conf), C.size_t(len(conf)))
 	if errCode != C.int(0) {
 		return nil, errors.New("could not create shard struct")
@@ -36,7 +37,7 @@ func New(conf string) (*Shard, error) {
 }
 
 func (s *Shard) Del() error {
-	C.kndShard_del__(nil)
+	C.kndShard_del__(s.shard)
 	return nil
 }
 
