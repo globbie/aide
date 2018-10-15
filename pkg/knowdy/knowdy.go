@@ -1,8 +1,8 @@
 package knowdy
 
-// #cgo CFLAGS: -I${SRCDIR}/knowdy/core/include
+// #cgo CFLAGS: -I${SRCDIR}/knowdy/include
 // #cgo CFLAGS: -I${SRCDIR}/knowdy/libs/gsl-parser/include
-// #cgo LDFLAGS: ${SRCDIR}/knowdy/build/lib/libcore_static.a
+// #cgo LDFLAGS: ${SRCDIR}/knowdy/build/lib/libknowdy_static.a
 // #cgo LDFLAGS: ${SRCDIR}/knowdy/build/lib/libglb-lib_static.a
 // #cgo LDFLAGS: ${SRCDIR}/knowdy/build/lib/libgsl-parser_static.a
 // #include <knd_shard.h>
@@ -15,7 +15,6 @@ package knowdy
 import "C"
 import (
 	"errors"
-	"unsafe"
 )
 
 type Shard struct {
@@ -25,7 +24,7 @@ type Shard struct {
 func New(conf string) (*Shard, error) {
 	var shard *C.struct_kndShard = nil
 
-	errCode := C.kndShard_new(&shard, C.CString(conf), C.size_t(len(conf)))
+	errCode := C.kndShard_new((**C.struct_kndShard)(&shard), C.CString(conf), C.size_t(len(conf)))
 	if errCode != C.int(0) {
 		return nil, errors.New("could not create shard struct")
 	}
@@ -41,12 +40,13 @@ func (s *Shard) Del() error {
 }
 
 func (s *Shard) RunTask(task string) (string, error) {
-	var outbuf [4096]byte
-	var outlen C.size_t
-	errCode := C.kndShard_run_task(s.shard, C.CString(task), C.size_t(len(task)), (*C.char)(unsafe.Pointer(&outbuf)), (*C.size_t)(unsafe.Pointer(&outlen)))
+	var output *C.char
+	var outputLen C.size_t
+
+	errCode := C.kndShard_run_task(s.shard, C.CString(task), C.size_t(len(task)), (**C.char)(&output), &outputLen)
 	if errCode != C.int(0) {
 		return "", errors.New("could not create shard struct")
 	}
-	return string(outbuf[:outlen]), nil
+	return C.GoStringN(output, C.int(outputLen)), nil
 }
 

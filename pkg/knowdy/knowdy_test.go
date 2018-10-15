@@ -8,11 +8,16 @@ import (
 const shardCfg = `
 {schema knd
 	{agent 007}
-	{path .}
-	{user User}
-	{schemas ../../config/knowdy-schemas/basic}
-	{sid AUTH_SERVER_SID}
+	{db-path .}
+	{schema-path testdata/system-schemas 
+		{user User
+			{base-repo shared-repo
+				{schema-path testdata/shared-schemas}
+			}
+		}
+	}
 	{memory
+		{-- TODO: check limits 0 1? --}
 		{max_base_pages        20000}
 		{max_small_x4_pages    4500}
 		{max_small_x2_pages    150000}
@@ -31,6 +36,6 @@ func TestShard(t *testing.T) {
 	if err != nil {
 		t.Error(err)
 	}
-	log.Println(result)
+	log.Println("empty task result:", result)
 	defer shard.Del()
 }
