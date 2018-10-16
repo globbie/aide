@@ -49,4 +49,3 @@ func (s *Shard) RunTask(task string) (string, error) {
 	}
 	return C.GoStringN(output, C.int(outputLen)), nil
 }
-
