@@ -15,10 +15,12 @@ package knowdy
 import "C"
 import (
 	"errors"
+	"sync"
 )
 
 type Shard struct {
 	shard *C.struct_kndShard
+	lock  sync.Mutex
 }
 
 func New(conf string) (*Shard, error) {
@@ -40,6 +42,9 @@ func (s *Shard) Del() error {
 }
 
 func (s *Shard) RunTask(task string) (string, error) {
+	s.lock.Lock()
+	defer s.lock.Unlock()
+
 	var output *C.char
 	var outputLen C.size_t
 
