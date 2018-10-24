@@ -72,7 +72,7 @@ func main() {
 		close(done)
 	}()
 
-	log.Println("server is ready to handle request at:", listenAddress)
+	log.Println("server is ready to handle requests at:", listenAddress)
 
 	err = server.ListenAndServe()
 	if err != nil && err != http.ErrServerClosed {
