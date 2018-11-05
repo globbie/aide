@@ -18,4 +18,5 @@ before_install:
     - git submodule update --init --recursive
 
 script:
+    - cd pkg/knowdy/knowdy && cmake .. && make && cd -
     - go test -v ./...
