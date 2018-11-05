@@ -10,7 +10,7 @@ git:
 
 # manual handle git submodules
 before_install:
-    - sed -i 's/git@github.com:/https:\/\/github.com\//' .gitmodules
+    - find . -name ".gitmodules" | xargs sed -i 's/git@github.com:/https:\/\/github.com\//'
     - git submodule update --init --recursive
 
 script:
