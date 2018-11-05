@@ -5,5 +5,13 @@ language: go
 go:
     - "1.10.x"
 
+git:
+    submodules: false
+
+# manual handle git submodules
+before_install:
+    - sed -i 's/git@github.com:/https:\/\/github.com\//' .gitmodules
+    - git submodule update --init --recursive
+
 script:
     - go test -v ./...
