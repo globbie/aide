@@ -16,7 +16,7 @@ before_install:
     - find . -name ".gitmodules" | xargs sed -i 's/git@github.com:/https:\/\/github.com\//'
     - find . -name ".gitmodules" | xargs cat
     - git submodule update --init --recursive
-    - cd pkg/knowdy/knowdy && cmake .. && make && cd -
+    - cd pkg/knowdy/knowdy && mkdir build && cd build && cmake .. && make && cd ../../../../
 
 script:
     - go test -v ./...
