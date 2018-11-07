@@ -48,7 +48,8 @@ func (s *Shard) RunTask(task string) (string, error) {
 	var output *C.char
 	var outputLen C.size_t
 
-	errCode := C.kndShard_run_task(s.shard, C.CString(task), C.size_t(len(task)), (**C.char)(&output), &outputLen)
+	// todo: remove hardcoded task id
+	errCode := C.kndShard_run_task(s.shard, C.CString(task), C.size_t(len(task)), (**C.char)(&output), &outputLen, C.size_t(0))
 	if errCode != C.int(0) {
 		return "", errors.New("could not create shard struct")
 	}
