@@ -3,20 +3,15 @@ sudo: required
 language: go
 
 go:
-    - "1.10.x"
+  - "1.10.x"
+
+services:
+  - docker
 
 git:
-    submodules: false
+  submodules: false
 
-# manual handle git submodules
-before_install:
-    - find . -name ".gitmodules" | xargs sed -i 's/git@github.com:/https:\/\/github.com\//'
-    - find . -name ".gitmodules" | xargs cat
-    - git submodule update --init
-    - find . -name ".gitmodules" | xargs sed -i 's/git@github.com:/https:\/\/github.com\//'
-    - find . -name ".gitmodules" | xargs cat
-    - git submodule update --init --recursive
-    - cd pkg/knowdy/knowdy && mkdir build && cd build && cmake .. && make && cd ../../../../
+install: true
 
 script:
-    - go test -v ./...
+  - docker build .
