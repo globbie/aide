@@ -14,4 +14,4 @@ git:
 install: true
 
 script:
-  - docker build .
+  - docker build -t tmp -f Dockerfile.build .
