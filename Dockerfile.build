@@ -14,7 +14,7 @@ RUN find . -name ".gitmodules" | xargs sed -i "s/git@github.com:/https:\/\/githu
         find . -name ".gitmodules" | xargs sed -i "s/git@github.com:/https:\/\/github.com\//"; \
         git submodule update --init --recursive
 
-RUN cd pkg/knowdy/knowdy && mkdir -p build && cd build && rm -rf * && cmake .. && make
+RUN ./build_knowdy.sh
 
 RUN go build -o gnode cmd/gnode/*.go
 RUN go test -v ./...
