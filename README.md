@@ -1,6 +1,6 @@
 # Gnode
 
-Knowdy library Golang wrapper.
+A Golang wrapper for Knowdy.
 
 ## Build
 
