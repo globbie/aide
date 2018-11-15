@@ -1,5 +1,22 @@
+# Gnode
 
+Knowdy library Golang wrapper.
 
-1. git submodule update --init --recursive
-2. cd knowdy && mkdir build && cd build && cmake .. && make
-3. cd ../../ && go build main.go
+## Build
+
+1. `git submodule update --init --recursive`
+2. `./build_knowdy.sh`
+
+## Test
+
+`go test -v ./...`
+
+## Run
+
+```bash
+go run -config-path <config-path> -listen-address <address:port>
+```
+
+## Config example
+
+See `config/shard.gsl`
