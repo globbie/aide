@@ -3,8 +3,8 @@ package knowdy
 // #cgo CFLAGS: -I${SRCDIR}/knowdy/include
 // #cgo CFLAGS: -I${SRCDIR}/knowdy/libs/gsl-parser/include
 // #cgo LDFLAGS: ${SRCDIR}/knowdy/build/lib/libknowdy_static.a
-// #cgo LDFLAGS: ${SRCDIR}/knowdy/build/lib/libglb-lib_static.a
-// #cgo LDFLAGS: ${SRCDIR}/knowdy/build/lib/libgsl-parser_static.a
+// #cgo LDFLAGS: ${SRCDIR}/knowdy/build/libs/gsl-parser/lib/libgsl-parser_static.a
+// #cgo LDFLAGS: ${SRCDIR}/knowdy/build/libs/glb-lib/lib/libglb-lib_static.a
 // #include <knd_shard.h>
 // static void kndShard_del__(struct kndShard *shard)
 // {
