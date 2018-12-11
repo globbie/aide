@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 
-ROOT_DIR="$(dirname $(readlink -f "$0"))"
+ROOT_DIR="$(dirname "$PWD/$0")"
 
 KNOWDY_SRC="${ROOT_DIR}/pkg/knowdy/knowdy"
 KNOWDY_BUILD="${KNOWDY_SRC}/build"
