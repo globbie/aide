@@ -44,10 +44,11 @@ func main() {
 	defer shard.Del()
 
 	router := http.NewServeMux()
-	router.Handle("/gsl", gslHandler(shard))
+	router.Handle("/gsl", measurer(limiter(gslHandler(shard), requestsMax, duration)))
+	router.Handle("/metrics", metricsHandler)
 
 	server := &http.Server{
-		Handler:      logger(limiter(router, requestsMax, duration)),
+		Handler:      logger(router),
 		ReadTimeout:  5 * time.Second,
 		WriteTimeout: 5 * time.Second,
 		IdleTimeout:  15 * time.Second,
@@ -116,12 +117,18 @@ func gslHandler(shard *knowdy.Shard) http.Handler {
 			http.Error(w, "internal server error", http.StatusInternalServerError)
 			return
 		}
-		result, err := shard.RunTask(string(body))
+		result, taskType, err := shard.RunTask(string(body))
 		if err != nil {
 			http.Error(w, "internal server error", http.StatusInternalServerError)
 			return
 		}
+
 		w.Header().Set("Content-Type", "application/json")
 		fmt.Fprint(w, result)
+
+		if metrics, ok := r.Context().Value(metricsKey).(*Metrics); ok {
+			metrics.Success = true
+			metrics.TaskType = taskType
+		}
 	})
 }

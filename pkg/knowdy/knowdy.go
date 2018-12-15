@@ -1,11 +1,13 @@
 package knowdy
 
 // #cgo CFLAGS: -I${SRCDIR}/knowdy/include
+// #cgo CFLAGS: -I${SRCDIR}/knowdy/libs/glb-lib/include
 // #cgo CFLAGS: -I${SRCDIR}/knowdy/libs/gsl-parser/include
 // #cgo LDFLAGS: ${SRCDIR}/knowdy/build/lib/libknowdy_static.a
-// #cgo LDFLAGS: ${SRCDIR}/knowdy/build/libs/gsl-parser/lib/libgsl-parser_static.a
 // #cgo LDFLAGS: ${SRCDIR}/knowdy/build/libs/glb-lib/lib/libglb-lib_static.a
+// #cgo LDFLAGS: ${SRCDIR}/knowdy/build/libs/gsl-parser/lib/libgsl-parser_static.a
 // #include <knd_shard.h>
+// #include <knd_task.h>
 // static void kndShard_del__(struct kndShard *shard)
 // {
 //     if (shard) {
@@ -41,17 +43,27 @@ func (s *Shard) Del() error {
 	return nil
 }
 
-func (s *Shard) RunTask(task string) (string, error) {
+func taskTypeToStr(v C.int) string {
+	switch v {
+	case C.KND_GET_STATE:    return "get"
+	case C.KND_SELECT_STATE: return "select"
+	case C.KND_UPDATE_STATE: return "update"
+	default:                 return "unknown"
+	}
+}
+
+func (s *Shard) RunTask(task string) (string, string, error) {
 	s.lock.Lock()
 	defer s.lock.Unlock()
 
 	var output *C.char
 	var outputLen C.size_t
+	var outputTaskType C.int
 
 	// todo: remove hardcoded task id
-	errCode := C.kndShard_run_task(s.shard, C.CString(task), C.size_t(len(task)), (**C.char)(&output), &outputLen, C.size_t(0))
+	errCode := C.kndShard_run_task(s.shard, C.CString(task), C.size_t(len(task)), &output, &outputLen, &outputTaskType, 0)
 	if errCode != C.int(0) {
-		return "", errors.New("could not create shard struct")
+		return "", "", errors.New("could not create shard struct")
 	}
-	return C.GoStringN(output, C.int(outputLen)), nil
+	return C.GoStringN(output, C.int(outputLen)), taskTypeToStr(outputTaskType), nil
 }
