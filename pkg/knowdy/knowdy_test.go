@@ -32,7 +32,7 @@ func TestShard(t *testing.T) {
 	if err != nil {
 		t.Error(err)
 	}
-	result, err := shard.RunTask("{task {tid 123}}")
+	result, _, err := shard.RunTask("{task {tid 123}}")
 	if err != nil {
 		t.Error(err)
 	}
