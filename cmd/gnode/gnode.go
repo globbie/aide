@@ -1,10 +1,10 @@
 package main
 
 import (
+	"context"
 	"flag"
 	"fmt"
 	"github.com/globbie/gnode/pkg/knowdy"
-	"golang.org/x/net/context"
 	"io/ioutil"
 	"log"
 	"net/http"
