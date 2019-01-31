@@ -11,7 +11,7 @@ package knowdy
 // static void kndShard_del__(struct kndShard *shard)
 // {
 //     if (shard) {
-//         kndShard_del(shard);
+//         knd_shard_del(shard);
 //     }
 // }
 import "C"
@@ -28,11 +28,16 @@ type Shard struct {
 func New(conf string) (*Shard, error) {
 	var shard *C.struct_kndShard = nil
 
-	errCode := C.kndShard_new((**C.struct_kndShard)(&shard), C.CString(conf), C.size_t(len(conf)))
+	errCode := C.knd_shard_new((**C.struct_kndShard)(&shard), C.CString(conf), C.size_t(len(conf)))
 	if errCode != C.int(0) {
 		return nil, errors.New("could not create shard struct")
 	}
-	ret := &Shard{
+
+	errCode = C.knd_shard_serve((*C.struct_kndShard)(shard))
+	if errCode != C.int(0) {
+		return nil, errors.New("could not start Knowdy shard's service")
+	}
+        ret := &Shard{
 		shard: shard,
 	}
 	return ret, nil
@@ -53,15 +58,14 @@ func taskTypeToStr(v C.int) string {
 }
 
 func (s *Shard) RunTask(task string) (string, string, error) {
-	s.lock.Lock()
-	defer s.lock.Unlock()
+	// s.lock.Lock()
+	// defer s.lock.Unlock()
 
 	var output *C.char
 	var outputLen C.size_t
 	var outputTaskType C.int
 
-	// todo: remove hardcoded task id
-	errCode := C.kndShard_run_task(s.shard, C.CString(task), C.size_t(len(task)), &output, &outputLen, &outputTaskType, 0)
+	errCode := C.knd_shard_run_task(s.shard, C.CString(task), C.size_t(len(task)), &output, &outputLen, nil)
 	if errCode != C.int(0) {
 		return "", "", errors.New("could not create shard struct")
 	}
