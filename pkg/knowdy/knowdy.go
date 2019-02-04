@@ -17,12 +17,11 @@ package knowdy
 import "C"
 import (
 	"errors"
-	"sync"
+	"unsafe"
 )
 
 type Shard struct {
 	shard *C.struct_kndShard
-	lock  sync.Mutex
 }
 
 func New(conf string) (*Shard, error) {
@@ -32,7 +31,6 @@ func New(conf string) (*Shard, error) {
 	if errCode != C.int(0) {
 		return nil, errors.New("could not create shard struct")
 	}
-
 	errCode = C.knd_shard_serve((*C.struct_kndShard)(shard))
 	if errCode != C.int(0) {
 		return nil, errors.New("could not start Knowdy shard's service")
@@ -58,16 +56,15 @@ func taskTypeToStr(v C.int) string {
 }
 
 func (s *Shard) RunTask(task string) (string, string, error) {
-	// s.lock.Lock()
-	// defer s.lock.Unlock()
+	output := C.malloc(1024 * 1024)
+        defer C.free(unsafe.Pointer(output))
 
-	var output *C.char
-	var outputLen C.size_t
+        var outputLen C.size_t = 1024 * 1024
 	var outputTaskType C.int
 
-	errCode := C.knd_shard_run_task(s.shard, C.CString(task), C.size_t(len(task)), &output, &outputLen, nil)
+	errCode := C.knd_shard_run_task(s.shard, C.CString(task), C.size_t(len(task)), (*C.char)(output), &outputLen)
 	if errCode != C.int(0) {
 		return "", "", errors.New("could not create shard struct")
 	}
-	return C.GoStringN(output, C.int(outputLen)), taskTypeToStr(outputTaskType), nil
+	return C.GoStringN((*C.char)(output), C.int(outputLen)), taskTypeToStr(outputTaskType), nil
 }
