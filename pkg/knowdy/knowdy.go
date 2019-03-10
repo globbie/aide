@@ -56,10 +56,10 @@ func taskTypeToStr(v C.int) string {
 }
 
 func (s *Shard) RunTask(task string) (string, string, error) {
-	output := C.malloc(1024 * 1024)
+        var outputLen C.size_t = C.sizeof_char * 1024 * 1024
+	output := C.malloc(outputLen)
         defer C.free(unsafe.Pointer(output))
 
-        var outputLen C.size_t = 1024 * 1024
 	var outputTaskType C.int
 
 	errCode := C.knd_shard_run_task(s.shard, C.CString(task), C.size_t(len(task)), (*C.char)(output), &outputLen)
