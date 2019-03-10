@@ -1,12 +1,9 @@
 [submodule "knowdy"]
 	path = pkg/knowdy/knowdy
-	url = git@github.com:globbie/knowdy.git
+	url = https://github.com/globbie/knowdy.git
 [submodule "config/knowdy-schemas"]
 	path = config/knowdy-schemas
-	url = git@github.com:globbie/knowdy-schemas.git
-[submodule "pkg/knowdy/-b"]
-	path = pkg/knowdy/-b
-	url = git@github.com:globbie/knowdy.git
+	url = https://github.com/globbie/knowdy-schemas.git
 [submodule "pkg/knowdy/knowdy"]
 	path = pkg/knowdy/knowdy
-	url = git@github.com:globbie/knowdy.git
+	url = https://github.com/globbie/knowdy.git
