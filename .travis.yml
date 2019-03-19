@@ -1,23 +1,40 @@
 language: go
 go:
-  - 1.11.x
+- 1.11.x
 services:
-  - docker
+- docker
 git:
   submodules: false
+branches:
+  except:
+  - "/^*-v[0-9]/"
 install:
-  - go get ./...
-  - go get github.com/mattn/goveralls
+- go get github.com/mattn/goveralls
 script:
-  - go test -v -covermode=count -coverprofile=coverage.out ./...
-  - $HOME/gopath/bin/goveralls -coverprofile=coverage.out -service=travis-ci -repotoken=$COVERALLS_TOKEN
-after_success:
-  - docker login -u $DOCKER_USER -p $DOCKER_PASSWORD
-  - export REPO=globbie/gnode
-  - export TAG=`if [ "$TRAVIS_BRANCH" == "master" ]; then echo "latest"; else echo "devel" ; fi`
-  - echo $REPO:$TAG
-  - docker build -f Dockerfile.build -t $REPO:$TAG.
-  - 'if [ "$TRAVIS_PULL_REQUEST" == "false" ]; then docker push $REPO ; fi'
+- export GIT_TAG=$TRAVIS_BRANCH-$TRAVIS_BUILD_NUMBER
+- export TAG=`if [ "$TRAVIS_BRANCH" == "master" ]; then echo "latest"; else echo $TRAVIS_BRANCH;
+  fi`
+- "./deploy.sh"
+- "$HOME/gopath/bin/goveralls -coverprofile=coverage.out -service=travis-ci -repotoken=$COVERALLS_TOKEN"
+before_deploy:
+- git config --local user.name "travis-ci"
+- git config --local user.email "info@globbie.com"
+- export GIT_TAG=$TRAVIS_BRANCH-$TRAVIS_BUILD_NUMBER
+- git tag $GIT_TAG -a -m "Generated tag from TravisCI for build $TRAVIS_BUILD_NUMBER"
+- git push -q https://$GITHUB_TOKEN@github.com/globbie/gnode --tags
+deploy:
+  provider: releases
+  skip_cleanup: true
+  api_key:
+    secure: coLeIchgfSlooA59eGyqLV27c+L+26yTOmAnvoEiH56yCtrCWHHNheMksJ8VWPr4z4lGBbPdSU+IrDTnid4LneeHq7BaCZANIQIxno98otbqIerH0q8VvEg1c82D1n7K51ezwJ5q7i+xqVMeJDLhXP3K1WvJnxNGzfU/apM7qeK32GT9pduon0NxJBIQBNJ/ovhgtmf/ywkqnAnutmQvhoRGL89uwarQWu+pGNkOnSp5l+c9WN3XHOSYGgOC7ifqe821Ny7tekeolXKpWKn85cV+Ca8xKC0A3QyFDuGpZS7HzBOLzyJSrrWNo8dV4VebLGQO+VHZswO+1iha5WtndZDWOUyupt/ERfNt6KOzsPEBsN7yA6zqfldfTYIb4mKk4rAETX0OoKvPgFk/pfP8CNQnAwOGxUscLVSZwAqap0NZxoyRFDzxT4/Kug73c2geKLnHHejtpkvglEeqsjHNd4vJeTksZX8VvcWbtKHgxhRNndNxM/BfiLQmxhF6qp6MJ9jdMjyGob6jN/9qpDFBpndrOYMIHt/pQS3ZeuuwEdgg3xEfseDmHlgJ8BApZwq7gecADNJ7XuIYDyYFIf5Nf9m7fvdLsUX66wr9hE0bOABxYD/72sj8eN2UZv3RZE6J0/Px0K+p0aok6nGu0YKF8/9CCfN6bvgFWqppFiSRn6U=
+  file: README.md
+  on:
+    tags: false
+    repo: globbie/gnode
+    branch: master
 notifications:
   slack:
     secure: Wz69KlzHNuEJS45d3ybJJE892cDVInnRIPQa19ix0Tq8v1ke1hVg3/EPV82Sgp/hLBxmhjeKk6sDnEqsE5ndOb2xA54usoCReO+hulEVOsUlNUkMehk3HgfynQPATf3PVpgJPpbhl/V9v9zeK3cneBJagzGrbxFr9fM0lktsM9Jq6CmpkWkqVoU69XzjI36aGKdN8lAzEUMvMVrkx2FdN6nBHytWKugx5gEJG0IAMIv9FhhVf/nZvAePfuRbWzVdZh77h2PY/PTMpOBmK6jLSEM7BAcwQkT6r4bJT8WiEfANNT/xIz4+aZbjpbimj6hpq9P7HaeIxrMLTNI8ZXGgoMADRAnWfaFLa/ISdNR/MmUVWXLuCSZRCJ0Yd3dKRm4doeG+PUZDcSW8TG4e8aN1xHweO/1KpJljFamBvmMVLmQRh8GPksMWAd2dLROxlkvZeKPkVheFys4o533e0MptSLlowI2g7whrFzYo3OVK9LeiryuTv+7t1K9Jrab60gD98ut1rkVZhvrwsR7ZoZNLVdpJRcF9T3nP1O3/4uOmyYFQnt+nsTbc7f/fuigZ0N5wLgOydwVrTV95r74P2nIjNEK28a3AChHcY4VImNOTsIyvqhfjjLiY74aRCJu2ZoGHf1znBwTqgmxb3ArHTHdzuxqYfP1MGsrr+l6/teECSYU=
+env:
+  global:
+    secure: gN8LYOS/NN3LuyCWnpmRtW7uY3MXjnnYRE2/4ZTN02I3b1cKLFBYDGuNyar5k7r7QCzDAIX1/GsIK7TiiLrfSytkOrMiyAc0K3JzSVs2c5B3sR3yxFc1VaAWaJmcc5ReJaheLSbZEAYLUG5attTOyBif0Xq7jS9peeYcY1x11AYspMf+v/zJi0iH6F5pfCG8msth3lTc1tIW4gOEuFNl2rfIdLmHbB3psw+1F1KstYCYJ1enmwW1H59hsd4y8nc2xmmUAUQ6we/T+v2KsEGovBI0l3gd6kvLil9OarpKViz+7CqpkIn8WlAfjGEX8V6g6t7QkFyGxMwJEQYj7q2V/Md0bb464p5Z2eBHDe2mKEfFUsowPSY8mqcoLM7Y4hbZev+9iEoPvxk/gawExxRD5vgssN7dKZDkQCqIvs42ji7qCY2dP+e+w+6JiZU7Heh61C2PMmfTy2aTvmAvpw1ZIJgXFpxAyorAS5AyUvBM+Osu8d+X1ekUJVGYjRm5GKtlH9PyPEN0pZYD5SS3R5OFIv0v5i9OgCZMXh9v5ntjEVSCyGMKTa1FE3c/Yfh57iip7aV6N3GUVbiMdIrEYLCsDJsbucRtXC47G6CgIhzoOIzlMcoTKeiAJOmuBgG4x/njv1RzDPbyNfx8lpQtxQP8hm6330+Kt/vBf17TW6YwO4A=
