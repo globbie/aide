@@ -1,7 +1,7 @@
 FROM debian
 
 # todo: find a way better to copy config
-ADD pkg/knowdy/knowdy/etc/knowdy/shard.gsl /etc/knowdy/
+#ADD pkg/knowdy/knowdy/etc/knowdy/shard.gsl /etc/knowdy/
 ADD gnode /usr/bin/
 
 ADD schemas /etc/knowdy/schemas
