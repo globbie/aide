@@ -1,5 +1,7 @@
 # Gnode
 
+[![Coverage Status](https://coveralls.io/repos/github/globbie/gnode/badge.svg?branch=master)](https://coveralls.io/github/globbie/gnode?branch=master)
+
 A Golang wrapper for Knowdy.
 
 ## Build
