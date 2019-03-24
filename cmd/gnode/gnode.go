@@ -81,7 +81,7 @@ func main() {
 	}
 
 	<-done
-	log.Println("server stopped")
+	log.Println("server stopped.")
 }
 
 func logger(h http.Handler) http.Handler {
