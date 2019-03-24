@@ -16,7 +16,6 @@ script:
 - export TAG=`if [ "$TRAVIS_BRANCH" == "master" ]; then echo "latest"; else echo $TRAVIS_BRANCH; fi`
 - "./deploy.sh"
 - "$HOME/gopath/bin/goveralls -coverprofile=coverage.out -service=travis-ci -repotoken=$COVERALLS_TOKEN"
-- tar -czf gnode-$GIT_TAG-linux-amd64.tar.gz gnode
 before_deploy:
 - git config --local user.name "travis-ci"
 - git config --local user.email "info@globbie.com"
@@ -29,7 +28,7 @@ deploy:
   skip_cleanup: true
   api_key:
     secure: coLeIchgfSlooA59eGyqLV27c+L+26yTOmAnvoEiH56yCtrCWHHNheMksJ8VWPr4z4lGBbPdSU+IrDTnid4LneeHq7BaCZANIQIxno98otbqIerH0q8VvEg1c82D1n7K51ezwJ5q7i+xqVMeJDLhXP3K1WvJnxNGzfU/apM7qeK32GT9pduon0NxJBIQBNJ/ovhgtmf/ywkqnAnutmQvhoRGL89uwarQWu+pGNkOnSp5l+c9WN3XHOSYGgOC7ifqe821Ny7tekeolXKpWKn85cV+Ca8xKC0A3QyFDuGpZS7HzBOLzyJSrrWNo8dV4VebLGQO+VHZswO+1iha5WtndZDWOUyupt/ERfNt6KOzsPEBsN7yA6zqfldfTYIb4mKk4rAETX0OoKvPgFk/pfP8CNQnAwOGxUscLVSZwAqap0NZxoyRFDzxT4/Kug73c2geKLnHHejtpkvglEeqsjHNd4vJeTksZX8VvcWbtKHgxhRNndNxM/BfiLQmxhF6qp6MJ9jdMjyGob6jN/9qpDFBpndrOYMIHt/pQS3ZeuuwEdgg3xEfseDmHlgJ8BApZwq7gecADNJ7XuIYDyYFIf5Nf9m7fvdLsUX66wr9hE0bOABxYD/72sj8eN2UZv3RZE6J0/Px0K+p0aok6nGu0YKF8/9CCfN6bvgFWqppFiSRn6U=
-  file: gnode-$GIT_TAG-linux-amd64.tar.gz
+  file: gnode
   on:
     tags: false
     repo: globbie/gnode
