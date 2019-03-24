@@ -14,7 +14,7 @@ install:
 script:
 - export GIT_TAG=$TRAVIS_BRANCH-$TRAVIS_BUILD_NUMBER
 - export TAG=`if [ "$TRAVIS_BRANCH" == "master" ]; then echo "latest"; else echo $TRAVIS_BRANCH; fi`
-- "./deploy.sh"
+- "./build.sh"
 - "$HOME/gopath/bin/goveralls -coverprofile=coverage.out -service=travis-ci -repotoken=$COVERALLS_TOKEN"
 before_deploy:
 - git config --local user.name "travis-ci"

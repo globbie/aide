@@ -33,4 +33,4 @@ See `config/shard.gsl`
 docker run -p 8081:8081 globbie/gnode
 ```
 
-If you want to build your own Docker image, please see `deploy.sh` script.
+If you want to build your own Docker image, please see `build.sh` script.
