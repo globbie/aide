@@ -2,38 +2,96 @@ package main
 
 import (
 	"context"
+	"crypto/rsa"
+	"encoding/json"
 	"flag"
 	"fmt"
-	"github.com/globbie/gnode/pkg/knowdy"
 	"io/ioutil"
 	"log"
 	"net/http"
 	"os"
 	"os/signal"
 	"time"
+
+	"github.com/dgrijalva/jwt-go"
+	"github.com/dgrijalva/jwt-go/request"
+
+	"github.com/globbie/gnode/pkg/knowdy"
 )
+
+type Config struct {
+	ListenAddress   string `json:"listen-address"`
+	ShardConfigPath string `json:"shard-config"`
+
+	RequestsMax       int           `json:"requests-max"`
+	SlotAwaitDuration time.Duration `json:"slot-await-duration"`
+
+	VerifyKeyPath string `json:"verify-key-path"`
+}
 
 var (
-	listenAddress string
-	shardConfig   string
-	requestsMax   int
-	duration      time.Duration
+	cfg *Config
+
+	shardConfig string
+	VerifyKey   *rsa.PublicKey
 )
 
+// todo(n.rodionov): write a separate function for each {} excess block
 func init() {
-	var configPath string
+	var (
+		configPath      string
+		shardConfigPath string
+		listenAddress   string
+		verifyKeyPath   string
+	)
 
-	flag.StringVar(&listenAddress, "listen-address", "localhost:8082", "gnode listen address")
-	flag.StringVar(&configPath, "config-path", "/etc/knowdy/shard.gsl", "path to knowdy config")
-	flag.IntVar(&requestsMax, "requests-limit", 10, "maximum number of requests are processed simultaneously")
-	flag.DurationVar(&duration, "request-limit-duration", 1*time.Second, "free slot awaiting time")
+	flag.StringVar(&configPath, "config-path", "/etc/gnode/config.json", "path to the config file")
+	flag.StringVar(&shardConfigPath, "shard-config-path", "", "redefine shard config path")
+	flag.StringVar(&listenAddress, "listen-address", "", "redefine listen address")
+	flag.StringVar(&verifyKeyPath, "verify-key-path", "", "redefine verify key path")
 	flag.Parse()
 
-	shardConfigBytes, err := ioutil.ReadFile(configPath)
-	if err != nil {
-		log.Fatalln("could not read shard config, error:", err)
+	{ // load config
+		configData, err := ioutil.ReadFile(configPath)
+		if err != nil {
+			log.Fatalln("could not read gnode config, error:", err)
+		}
+		err = json.Unmarshal(configData, &cfg)
+		if err != nil {
+			log.Fatalln("could not unmarshal config file, error:", err)
+		}
 	}
-	shardConfig = string(shardConfigBytes)
+
+	{ // redefine config with cmd-line parameters
+		if shardConfigPath != "" {
+			cfg.ShardConfigPath = shardConfigPath
+		}
+		if listenAddress != "" {
+			cfg.ListenAddress = listenAddress
+		}
+		if verifyKeyPath != "" {
+			cfg.VerifyKeyPath = verifyKeyPath
+		}
+	}
+
+	{ // load shard config
+		shardConfigBytes, err := ioutil.ReadFile(cfg.ShardConfigPath)
+		if err != nil {
+			log.Fatalln("could not read shard config, error:", err)
+		}
+		shardConfig = string(shardConfigBytes)
+	}
+
+	{ // load verify key
+		verifyBytes, err := ioutil.ReadFile(cfg.VerifyKeyPath)
+		if err != nil {
+			log.Fatalf("could not read verify key file('%v'), error: %v", cfg.VerifyKeyPath, err)
+		}
+		VerifyKey, err = jwt.ParseRSAPublicKeyFromPEM(verifyBytes)
+		if err != nil {
+			log.Fatalln(err)
+		}
+	}
 }
 
 func main() {
@@ -44,7 +102,7 @@ func main() {
 	defer shard.Del()
 
 	router := http.NewServeMux()
-	router.Handle("/gsl", measurer(limiter(gslHandler(shard), requestsMax, duration)))
+	router.Handle("/gsl", measurer(limiter(gslHandler(shard), cfg.RequestsMax, cfg.SlotAwaitDuration)))
 	router.Handle("/metrics", metricsHandler)
 
 	server := &http.Server{
@@ -52,7 +110,7 @@ func main() {
 		ReadTimeout:  5 * time.Second,
 		WriteTimeout: 5 * time.Second,
 		IdleTimeout:  15 * time.Second,
-		Addr:         listenAddress,
+		Addr:         cfg.ListenAddress,
 	}
 
 	done := make(chan bool)
@@ -73,7 +131,7 @@ func main() {
 		close(done)
 	}()
 
-	log.Println("server is ready to handle requests at:", listenAddress)
+	log.Println("server is ready to handle requests at:", cfg.ListenAddress)
 
 	err = server.ListenAndServe()
 	if err != nil && err != http.ErrServerClosed {
@@ -103,6 +161,20 @@ func limiter(h http.Handler, requestsMax int, duration time.Duration) http.Handl
 			log.Println("no free slots")
 			return
 		}
+	})
+}
+
+func authorization(h http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		token, err := request.ParseFromRequest(r, request.AuthorizationHeaderExtractor, func(token *jwt.Token) (interface{}, error) {
+			return VerifyKey, nil
+		})
+		if err != nil {
+			http.Error(w, "invalid token", http.StatusUnauthorized)
+			return
+		}
+		log.Println("authorized:", token.Claims)
+		h.ServeHTTP(w, r)
 	})
 }
 
