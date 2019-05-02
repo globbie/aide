@@ -30,8 +30,7 @@ type Config struct {
 }
 
 var (
-	cfg *Config
-
+	cfg         *Config
 	shardConfig string
 	VerifyKey   *rsa.PublicKey
 )
@@ -102,7 +101,7 @@ func main() {
 	defer shard.Del()
 
 	router := http.NewServeMux()
-	router.Handle("/gsl", measurer(limiter(gslHandler(shard), cfg.RequestsMax, cfg.SlotAwaitDuration)))
+	router.Handle("/gsl", measurer(authorization(limiter(gslHandler(shard), cfg.RequestsMax, cfg.SlotAwaitDuration))))
 	router.Handle("/metrics", metricsHandler)
 
 	server := &http.Server{
@@ -170,7 +169,7 @@ func authorization(h http.Handler) http.Handler {
 			return VerifyKey, nil
 		})
 		if err != nil {
-			http.Error(w, "invalid token", http.StatusUnauthorized)
+			http.Error(w, "unauthorized", http.StatusUnauthorized)
 			return
 		}
 		log.Println("authorized:", token.Claims)
