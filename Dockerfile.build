@@ -17,6 +17,7 @@ RUN find . -name ".gitmodules" | xargs sed -i "s/git@github.com:/https:\/\/githu
 RUN ./build_knowdy.sh
 
 # todo: move it to the base image
+RUN go get ./...
 RUN go get github.com/mattn/goveralls
 RUN go test -v -covermode=count -coverprofile=coverage.out ./...
 RUN ls -l
