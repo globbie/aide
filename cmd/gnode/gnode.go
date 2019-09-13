@@ -32,8 +32,13 @@ type Config struct {
 
 var (
 	cfg         *Config
+	shardConfigPath string
 	shardConfig string
-	VerifyKey   *rsa.PublicKey
+        verifyKeyPath string
+        VerifyKey   *rsa.PublicKey
+	listenAddress string
+	requestsMax   int
+	duration      time.Duration
 )
 
 // todo(n.rodionov): write a separate function for each {} excess block
