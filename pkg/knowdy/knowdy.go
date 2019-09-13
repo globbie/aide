@@ -39,12 +39,11 @@ func New(conf string, concurrencyFactor int) (*Shard, error) {
 
 	for i := 0; i < concurrencyFactor; i++ {
 		var task *C.struct_kndTask
-		errCode := C.knd_task_new(shard, nil, &task)
+		errCode := C.knd_task_new(shard, nil, C.int(i), &task)
 		if errCode != C.int(0) {
 			// todo(n.rodionov): call destructor
 			return nil, errors.New("could not create kndTask")
 		}
-		task.id = C.size_t(i)
 		proc.workers <- task
 	}
 	return &proc, nil
@@ -72,10 +71,11 @@ func (s *Shard) RunTask(task string) (string, string, error) {
 	worker := <-s.workers
 	defer func() { s.workers <- worker }()
 
-        worker.input = C.CString(task)
-        worker.input_size = C.size_t(len(task))
+	var ctx C.struct_kndTaskContext
+        worker.ctx = &ctx
+        C.knd_task_reset(worker)
 
-        errCode := C.knd_task_run(worker)
+        errCode := C.knd_task_run(worker, C.CString(task), C.size_t(len(task)))
 	if errCode != C.int(0) {
 		return "", "", errors.New("task execution failed")
 	}
