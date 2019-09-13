@@ -1,10 +1,8 @@
 package knowdy
 
 // #cgo CFLAGS: -I${SRCDIR}/knowdy/include
-// #cgo CFLAGS: -I${SRCDIR}/knowdy/libs/glb-lib/include
 // #cgo CFLAGS: -I${SRCDIR}/knowdy/libs/gsl-parser/include
 // #cgo LDFLAGS: ${SRCDIR}/knowdy/build/lib/libknowdy_static.a
-// #cgo LDFLAGS: ${SRCDIR}/knowdy/build/libs/glb-lib/lib/libglb-lib_static.a
 // #cgo LDFLAGS: ${SRCDIR}/knowdy/build/libs/gsl-parser/lib/libgsl-parser_static.a
 // #include <knd_shard.h>
 // #include <knd_task.h>
