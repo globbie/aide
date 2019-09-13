@@ -94,6 +94,13 @@ func init() {
 			log.Fatalln(err)
 		}
 	}
+
+        if (duration != 0) {
+                cfg.SlotAwaitDuration = duration
+        }
+        if (requestsMax != 0) {
+                cfg.RequestsMax = requestsMax
+        }
 }
 
 func main() {
