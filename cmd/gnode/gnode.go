@@ -11,6 +11,7 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"runtime"
 	"time"
 
 	"github.com/dgrijalva/jwt-go"
@@ -37,17 +38,12 @@ var (
 
 // todo(n.rodionov): write a separate function for each {} excess block
 func init() {
-	var (
-		configPath      string
-		shardConfigPath string
-		listenAddress   string
-		verifyKeyPath   string
-	)
+	var configPath string
 
-	flag.StringVar(&configPath, "config-path", "/etc/gnode/config.json", "path to the config file")
-	flag.StringVar(&shardConfigPath, "shard-config-path", "", "redefine shard config path")
-	flag.StringVar(&listenAddress, "listen-address", "", "redefine listen address")
-	flag.StringVar(&verifyKeyPath, "verify-key-path", "", "redefine verify key path")
+	flag.StringVar(&listenAddress, "listen-address", "localhost:8088", "gnode listen address")
+	flag.StringVar(&configPath, "config-path", "/etc/knowdy/shard.gsl", "path to knowdy config")
+	flag.IntVar(&requestsMax, "requests-limit", 10, "maximum number of requests to process simultaneously")
+	flag.DurationVar(&duration, "request-limit-duration", 1*time.Second, "free slot awaiting time")
 	flag.Parse()
 
 	{ // load config
@@ -94,7 +90,7 @@ func init() {
 }
 
 func main() {
-	shard, err := knowdy.New(shardConfig)
+	shard, err := knowdy.New(shardConfig, runtime.GOMAXPROCS(0))
 	if err != nil {
 		log.Fatalln("could not create knowdy shard, error:", err)
 	}
@@ -183,6 +179,7 @@ func gslHandler(shard *knowdy.Shard) http.Handler {
 			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
 			return
 		}
+		defer r.Body.Close()
 		body, err := ioutil.ReadAll(r.Body)
 		if err != nil {
 			http.Error(w, "internal server error", http.StatusInternalServerError)

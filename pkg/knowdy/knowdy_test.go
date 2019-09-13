@@ -7,7 +7,6 @@ import (
 
 const shardCfg = `
 {schema knd
-	{agent 007}
 	{db-path .}
 	{schema-path testdata/system-schemas 
 		{user User
@@ -28,7 +27,7 @@ const shardCfg = `
 `
 
 func TestShard(t *testing.T) {
-	shard, err := New(shardCfg)
+	shard, err := New(shardCfg, 1)
 	if err != nil {
 		t.Error(err)
 	}
