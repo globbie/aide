@@ -25,8 +25,6 @@ type Shard struct {
 func New(conf string, concurrencyFactor int) (*Shard, error) {
 	var shard *C.struct_kndShard = nil
 
-	log.Println(conf)
-
 	errCode := C.knd_shard_new((**C.struct_kndShard)(&shard), C.CString(conf), C.size_t(len(conf)))
 	if errCode != C.int(0) {
 		return nil, errors.New("could not create shard struct")
