@@ -21,9 +21,8 @@ import (
 )
 
 type Config struct {
-	ListenAddress   string `json:"listen-address"`
-	ShardConfigPath string `json:"shard-config"`
-
+	ListenAddress     string        `json:"listen-address"`
+	ShardConfigPath   string        `json:"shard-config"`
 	RequestsMax       int           `json:"requests-max"`
 	SlotAwaitDuration time.Duration `json:"slot-await-duration"`
 
@@ -32,21 +31,24 @@ type Config struct {
 
 var (
 	cfg         *Config
-	shardConfigPath string
-	shardConfig string
-        verifyKeyPath string
-        VerifyKey   *rsa.PublicKey
-	listenAddress string
-	requestsMax   int
-	duration      time.Duration
+	ShardConfig string
+	VerifyKey   *rsa.PublicKey
 )
 
 // todo(n.rodionov): write a separate function for each {} excess block
 func init() {
-	var configPath string
+	var (
+		configPath      string
+		shardConfigPath string
+		verifyKeyPath   string
+		listenAddress   string
+		requestsMax     int
+		duration        time.Duration
+	)
 
-	flag.StringVar(&listenAddress, "listen-address", "localhost:8088", "gnode listen address")
-	flag.StringVar(&configPath, "config-path", "/etc/knowdy/shard.gsl", "path to knowdy config")
+	flag.StringVar(&configPath, "key-path", "/etc/gnode/gnode.json", "path to Gnode config")
+	flag.StringVar(&shardConfigPath, "config-path", "/etc/knowdy/shard.gsl", "path to Knowdy config")
+	flag.StringVar(&listenAddress, "listen-address", "localhost:8088", "Gnode listen address")
 	flag.IntVar(&requestsMax, "requests-limit", 10, "maximum number of requests to process simultaneously")
 	flag.DurationVar(&duration, "request-limit-duration", 1*time.Second, "free slot awaiting time")
 	flag.Parse()
@@ -79,7 +81,7 @@ func init() {
 		if err != nil {
 			log.Fatalln("could not read shard config, error:", err)
 		}
-		shardConfig = string(shardConfigBytes)
+		ShardConfig = string(shardConfigBytes)
 	}
 
 	{ // load verify key
@@ -95,7 +97,7 @@ func init() {
 }
 
 func main() {
-	shard, err := knowdy.New(shardConfig, runtime.GOMAXPROCS(0))
+	shard, err := knowdy.New(ShardConfig, runtime.GOMAXPROCS(0))
 	if err != nil {
 		log.Fatalln("could not create knowdy shard, error:", err)
 	}

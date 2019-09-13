@@ -24,7 +24,6 @@ type Shard struct {
 
 func New(conf string, concurrencyFactor int) (*Shard, error) {
 	var shard *C.struct_kndShard = nil
-
 	errCode := C.knd_shard_new((**C.struct_kndShard)(&shard), C.CString(conf), C.size_t(len(conf)))
 	if errCode != C.int(0) {
 		return nil, errors.New("could not create shard struct")
@@ -70,10 +69,10 @@ func (s *Shard) RunTask(task string) (string, string, error) {
 	defer func() { s.workers <- worker }()
 
 	var ctx C.struct_kndTaskContext
-        worker.ctx = &ctx
-        C.knd_task_reset(worker)
+	worker.ctx = &ctx
+	C.knd_task_reset(worker)
 
-        errCode := C.knd_task_run(worker, C.CString(task), C.size_t(len(task)))
+	errCode := C.knd_task_run(worker, C.CString(task), C.size_t(len(task)))
 	if errCode != C.int(0) {
 		return "", "", errors.New("task execution failed")
 	}
