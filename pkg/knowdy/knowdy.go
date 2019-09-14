@@ -15,6 +15,7 @@ package knowdy
 import "C"
 import (
 	"errors"
+        "unsafe"
 )
 
 type Shard struct {
@@ -64,7 +65,7 @@ func taskTypeToStr(v C.int) string {
 	}
 }
 
-func (s *Shard) RunTask(task string) (string, string, error) {
+func (s *Shard) RunTask(task string, task_len int) (string, string, error) {
 	worker := <-s.workers
 	defer func() { s.workers <- worker }()
 
@@ -72,7 +73,10 @@ func (s *Shard) RunTask(task string) (string, string, error) {
 	worker.ctx = &ctx
 	C.knd_task_reset(worker)
 
-	errCode := C.knd_task_run(worker, C.CString(task), C.size_t(len(task)))
+        cs := C.CString(task)
+        defer C.free(unsafe.Pointer(cs))
+
+        errCode := C.knd_task_run(worker, cs, C.size_t(task_len))
 	if errCode != C.int(0) {
 		return "", "", errors.New("task execution failed")
 	}

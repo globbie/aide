@@ -199,7 +199,7 @@ func gslHandler(shard *knowdy.Shard) http.Handler {
 			http.Error(w, "internal server error", http.StatusInternalServerError)
 			return
 		}
-		result, taskType, err := shard.RunTask(string(body))
+		result, taskType, err := shard.RunTask(string(body), len(body))
 		if err != nil {
 			http.Error(w, "internal server error", http.StatusInternalServerError)
 			return
