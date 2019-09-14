@@ -1,34 +1,60 @@
 package knowdy
 
 import (
-        "fmt"
+	"bytes"
+	"fmt"
 	"io/ioutil"
-        "net/http"
-        "log"
+	"net/http"
+	"net/url"
 )
 
 func DecodeText(text string, addr string) (string, error) {
-	log.Println("TEXT:", text)
-	log.Println("GLT:", addr)
-        url := "http://" + addr + "/text-to-graph?t=" + text
-        fmt.Println("URL:", url)
+	Url, err := url.Parse("http://" + addr)
+	if err != nil {
+		panic("invalid URL")
+	}
+	Url.Path = "/text-to-graph"
+	parameters := url.Values{}
+	parameters.Add("t", text)
+	Url.RawQuery = parameters.Encode()
 
-        resp, err := http.Get(url)
-        if err != nil {
-                 panic(err)
-        }
-        defer resp.Body.Close()
+	fmt.Printf("Encoded URL is %q\n", Url.String())
 
-        fmt.Println("response Status:", resp.Status)
-        fmt.Println("response Headers:", resp.Header)
-        body, _ := ioutil.ReadAll(resp.Body)
-        fmt.Println("response Body:", string(body))
+	resp, err := http.Get(Url.String())
+	if err != nil {
+		panic(err)
+	}
+	defer resp.Body.Close()
 
-        return "OK", nil
+	fmt.Println("response Status:", resp.Status)
+	fmt.Println("response Headers:", resp.Header)
+	body, _ := ioutil.ReadAll(resp.Body)
+	fmt.Println("response Body:", string(body))
+
+	return string(body), nil
 }
 
-func EncodeText(graph string, addr string) (string, error) {
-	log.Println("GRAPH:", graph)
-	log.Println("GLT:", addr)
-        return "OK", nil
+func EncodeText(graph string, codeSystem string, addr string) (string, error) {
+	Url, err := url.Parse("http://" + addr)
+	if err != nil {
+		panic("invalid URL")
+	}
+	Url.Path = "/graph-to-text"
+	parameters := url.Values{}
+	parameters.Add("cs", codeSystem)
+	Url.RawQuery = parameters.Encode()
+
+	fmt.Printf("== URL is %q  Graph:%q\n", Url.String(), graph)
+
+	resp, err := http.Post(Url.String(), "text/plain; charset=utf-8", bytes.NewBuffer([]byte(graph)))
+	if err != nil {
+		panic(err)
+	}
+	defer resp.Body.Close()
+
+	fmt.Println("response Status:", resp.Status)
+	fmt.Println("response Headers:", resp.Header)
+	body, _ := ioutil.ReadAll(resp.Body)
+
+	return string(body), nil
 }
