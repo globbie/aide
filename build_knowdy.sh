@@ -13,5 +13,5 @@ if [ ! -d "${KNOWDY_BUILD}" ]; then
     cd -
 fi
 
-make -C "${KNOWDY_BUILD}" -j knowdy_static gsl-parser-external glb-lib-external
+make -C "${KNOWDY_BUILD}" -j knowdy_static gsl-parser-external
 

@@ -1,5 +1,7 @@
 # Gnode
 
+[![Coverage Status](https://coveralls.io/repos/github/globbie/gnode/badge.svg?branch=master)](https://coveralls.io/github/globbie/gnode?branch=master)
+
 A Golang wrapper for Knowdy.
 
 ## Build
@@ -31,4 +33,4 @@ See `config/shard.gsl`
 docker run -p 8081:8081 globbie/gnode
 ```
 
-If you want to build your own Docker image, please see `deploy.sh` script.
+If you want to build your own Docker image, please see `build.sh` script.

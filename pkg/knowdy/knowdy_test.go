@@ -1,7 +1,6 @@
 package knowdy
 
 import (
-	"log"
 	"testing"
 )
 
@@ -31,10 +30,9 @@ func TestShard(t *testing.T) {
 	if err != nil {
 		t.Error(err)
 	}
-	result, _, err := shard.RunTask("{task {tid 123}}")
-	if err != nil {
-		t.Error(err)
-	}
-	log.Println("empty task result:", result)
+	// result, _, err := shard.RunTask("{task {tid 123}}")
+	// if err != nil {
+	//	t.Error(err)
+	// }
 	defer shard.Del()
 }

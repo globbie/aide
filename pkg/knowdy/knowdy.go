@@ -1,10 +1,8 @@
 package knowdy
 
 // #cgo CFLAGS: -I${SRCDIR}/knowdy/include
-// #cgo CFLAGS: -I${SRCDIR}/knowdy/libs/glb-lib/include
 // #cgo CFLAGS: -I${SRCDIR}/knowdy/libs/gsl-parser/include
 // #cgo LDFLAGS: ${SRCDIR}/knowdy/build/lib/libknowdy_static.a
-// #cgo LDFLAGS: ${SRCDIR}/knowdy/build/libs/glb-lib/lib/libglb-lib_static.a
 // #cgo LDFLAGS: ${SRCDIR}/knowdy/build/libs/gsl-parser/lib/libgsl-parser_static.a
 // #include <knd_shard.h>
 // #include <knd_task.h>
@@ -17,6 +15,7 @@ package knowdy
 import "C"
 import (
 	"errors"
+        "unsafe"
 )
 
 type Shard struct {
@@ -26,7 +25,6 @@ type Shard struct {
 
 func New(conf string, concurrencyFactor int) (*Shard, error) {
 	var shard *C.struct_kndShard = nil
-
 	errCode := C.knd_shard_new((**C.struct_kndShard)(&shard), C.CString(conf), C.size_t(len(conf)))
 	if errCode != C.int(0) {
 		return nil, errors.New("could not create shard struct")
@@ -67,15 +65,18 @@ func taskTypeToStr(v C.int) string {
 	}
 }
 
-func (s *Shard) RunTask(task string) (string, string, error) {
+func (s *Shard) RunTask(task string, task_len int) (string, string, error) {
 	worker := <-s.workers
 	defer func() { s.workers <- worker }()
 
 	var ctx C.struct_kndTaskContext
-        worker.ctx = &ctx
-        C.knd_task_reset(worker)
+	worker.ctx = &ctx
+	C.knd_task_reset(worker)
 
-        errCode := C.knd_task_run(worker, C.CString(task), C.size_t(len(task)))
+        cs := C.CString(task)
+        defer C.free(unsafe.Pointer(cs))
+
+        errCode := C.knd_task_run(worker, cs, C.size_t(task_len))
 	if errCode != C.int(0) {
 		return "", "", errors.New("task execution failed")
 	}

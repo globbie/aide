@@ -2,9 +2,10 @@ package main
 
 import (
 	"context"
+	"crypto/rsa"
+	"encoding/json"
 	"flag"
 	"fmt"
-	"github.com/globbie/gnode/pkg/knowdy"
 	"io/ioutil"
 	"log"
 	"net/http"
@@ -12,40 +13,105 @@ import (
 	"os/signal"
 	"runtime"
 	"time"
+
+	"github.com/dgrijalva/jwt-go"
+	"github.com/dgrijalva/jwt-go/request"
+
+	"github.com/globbie/gnode/pkg/knowdy"
 )
+
+type Config struct {
+	ListenAddress     string        `json:"listen-address"`
+	ShardConfigPath   string        `json:"shard-config"`
+	RequestsMax       int           `json:"requests-max"`
+	SlotAwaitDuration time.Duration `json:"slot-await-duration"`
+
+	VerifyKeyPath string `json:"verify-key-path"`
+}
 
 var (
-	listenAddress string
-	shardConfig   string
-	requestsMax   int
-	duration      time.Duration
+	cfg         *Config
+	ShardConfig string
+	VerifyKey   *rsa.PublicKey
 )
 
+// todo(n.rodionov): write a separate function for each {} excess block
 func init() {
-	var configPath string
+	var (
+		configPath      string
+		shardConfigPath string
+		verifyKeyPath   string
+		listenAddress   string
+		requestsMax     int
+		duration        time.Duration
+	)
 
-	flag.StringVar(&listenAddress, "listen-address", "localhost:8088", "gnode listen address")
-	flag.StringVar(&configPath, "config-path", "/etc/knowdy/shard.gsl", "path to knowdy config")
+	flag.StringVar(&configPath, "key-path", "/etc/gnode/gnode.json", "path to Gnode config")
+	flag.StringVar(&shardConfigPath, "config-path", "/etc/knowdy/shard.gsl", "path to Knowdy config")
+	flag.StringVar(&listenAddress, "listen-address", "localhost:8088", "Gnode listen address")
 	flag.IntVar(&requestsMax, "requests-limit", 10, "maximum number of requests to process simultaneously")
 	flag.DurationVar(&duration, "request-limit-duration", 1*time.Second, "free slot awaiting time")
 	flag.Parse()
 
-	shardConfigBytes, err := ioutil.ReadFile(configPath)
-	if err != nil {
-		log.Fatalln("could not read shard config, error:", err)
+	{ // load config
+		configData, err := ioutil.ReadFile(configPath)
+		if err != nil {
+			log.Fatalln("could not read gnode config, error:", err)
+		}
+		err = json.Unmarshal(configData, &cfg)
+		if err != nil {
+			log.Fatalln("could not unmarshal config file, error:", err)
+		}
 	}
-	shardConfig = string(shardConfigBytes)
+
+	{ // redefine config with cmd-line parameters
+		if shardConfigPath != "" {
+			cfg.ShardConfigPath = shardConfigPath
+		}
+		if listenAddress != "" {
+			cfg.ListenAddress = listenAddress
+		}
+		if verifyKeyPath != "" {
+			cfg.VerifyKeyPath = verifyKeyPath
+		}
+	}
+
+	{ // load shard config
+		shardConfigBytes, err := ioutil.ReadFile(cfg.ShardConfigPath)
+		if err != nil {
+			log.Fatalln("could not read shard config, error:", err)
+		}
+		ShardConfig = string(shardConfigBytes)
+	}
+
+	{ // load verify key
+		verifyBytes, err := ioutil.ReadFile(cfg.VerifyKeyPath)
+		if err != nil {
+			log.Fatalf("could not read verify key file('%v'), error: %v", cfg.VerifyKeyPath, err)
+		}
+		VerifyKey, err = jwt.ParseRSAPublicKeyFromPEM(verifyBytes)
+		if err != nil {
+			log.Fatalln(err)
+		}
+	}
+
+        if (duration != 0) {
+                cfg.SlotAwaitDuration = duration
+        }
+        if (requestsMax != 0) {
+                cfg.RequestsMax = requestsMax
+        }
 }
 
 func main() {
-	shard, err := knowdy.New(shardConfig, runtime.GOMAXPROCS(0))
+	shard, err := knowdy.New(ShardConfig, runtime.GOMAXPROCS(0))
 	if err != nil {
 		log.Fatalln("could not create knowdy shard, error:", err)
 	}
 	defer shard.Del()
 
 	router := http.NewServeMux()
-	router.Handle("/gsl", measurer(limiter(gslHandler(shard), requestsMax, duration)))
+	router.Handle("/gsl", measurer(authorization(limiter(gslHandler(shard), cfg.RequestsMax, cfg.SlotAwaitDuration))))
 	router.Handle("/metrics", metricsHandler)
 
 	server := &http.Server{
@@ -53,7 +119,7 @@ func main() {
 		ReadTimeout:  5 * time.Second,
 		WriteTimeout: 5 * time.Second,
 		IdleTimeout:  15 * time.Second,
-		Addr:         listenAddress,
+		Addr:         cfg.ListenAddress,
 	}
 
 	done := make(chan bool)
@@ -74,7 +140,7 @@ func main() {
 		close(done)
 	}()
 
-	log.Println("server is ready to handle requests at:", listenAddress)
+	log.Println("server is ready to handle requests at:", cfg.ListenAddress)
 
 	err = server.ListenAndServe()
 	if err != nil && err != http.ErrServerClosed {
@@ -107,6 +173,20 @@ func limiter(h http.Handler, requestsMax int, duration time.Duration) http.Handl
 	})
 }
 
+func authorization(h http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		token, err := request.ParseFromRequest(r, request.AuthorizationHeaderExtractor, func(token *jwt.Token) (interface{}, error) {
+			return VerifyKey, nil
+		})
+		if err != nil {
+			http.Error(w, "unauthorized", http.StatusUnauthorized)
+			return
+		}
+		log.Println("authorized:", token.Claims)
+		h.ServeHTTP(w, r)
+	})
+}
+
 func gslHandler(shard *knowdy.Shard) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.Method != http.MethodPost {
@@ -119,7 +199,7 @@ func gslHandler(shard *knowdy.Shard) http.Handler {
 			http.Error(w, "internal server error", http.StatusInternalServerError)
 			return
 		}
-		result, taskType, err := shard.RunTask(string(body))
+		result, taskType, err := shard.RunTask(string(body), len(body))
 		if err != nil {
 			http.Error(w, "internal server error", http.StatusInternalServerError)
 			return
