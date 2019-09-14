@@ -22,7 +22,8 @@ import (
 
 type Config struct {
 	ListenAddress     string        `json:"listen-address"`
-	ShardConfigPath   string        `json:"shard-config"`
+	GltAddress        string        `json:"glt-address"`
+	KndConfigPath     string        `json:"shard-config"`
 	RequestsMax       int           `json:"requests-max"`
 	SlotAwaitDuration time.Duration `json:"slot-await-duration"`
 
@@ -30,24 +31,24 @@ type Config struct {
 }
 
 var (
-	cfg         *Config
-	ShardConfig string
-	VerifyKey   *rsa.PublicKey
+	cfg       *Config
+	KndConfig string
+	VerifyKey *rsa.PublicKey
 )
 
 // todo(n.rodionov): write a separate function for each {} excess block
 func init() {
 	var (
-		configPath      string
-		shardConfigPath string
-		verifyKeyPath   string
-		listenAddress   string
-		requestsMax     int
-		duration        time.Duration
+		configPath    string
+		kndConfigPath string
+		verifyKeyPath string
+		listenAddress string
+		requestsMax   int
+		duration      time.Duration
 	)
 
-	flag.StringVar(&configPath, "key-path", "/etc/gnode/gnode.json", "path to Gnode config")
-	flag.StringVar(&shardConfigPath, "config-path", "/etc/knowdy/shard.gsl", "path to Knowdy config")
+	flag.StringVar(&configPath, "config-path", "/etc/gnode/gnode.json", "path to Gnode config")
+	flag.StringVar(&kndConfigPath, "knd-config-path", "/etc/knowdy/shard.gsl", "path to Knowdy config")
 	flag.StringVar(&listenAddress, "listen-address", "localhost:8088", "Gnode listen address")
 	flag.IntVar(&requestsMax, "requests-limit", 10, "maximum number of requests to process simultaneously")
 	flag.DurationVar(&duration, "request-limit-duration", 1*time.Second, "free slot awaiting time")
@@ -65,8 +66,8 @@ func init() {
 	}
 
 	{ // redefine config with cmd-line parameters
-		if shardConfigPath != "" {
-			cfg.ShardConfigPath = shardConfigPath
+		if kndConfigPath != "" {
+			cfg.KndConfigPath = kndConfigPath
 		}
 		if listenAddress != "" {
 			cfg.ListenAddress = listenAddress
@@ -77,11 +78,11 @@ func init() {
 	}
 
 	{ // load shard config
-		shardConfigBytes, err := ioutil.ReadFile(cfg.ShardConfigPath)
+		shardConfigBytes, err := ioutil.ReadFile(cfg.KndConfigPath)
 		if err != nil {
 			log.Fatalln("could not read shard config, error:", err)
 		}
-		ShardConfig = string(shardConfigBytes)
+		KndConfig = string(shardConfigBytes)
 	}
 
 	{ // load verify key
@@ -95,16 +96,16 @@ func init() {
 		}
 	}
 
-        if (duration != 0) {
-                cfg.SlotAwaitDuration = duration
-        }
-        if (requestsMax != 0) {
-                cfg.RequestsMax = requestsMax
-        }
+	if duration != 0 {
+		cfg.SlotAwaitDuration = duration
+	}
+	if requestsMax != 0 {
+		cfg.RequestsMax = requestsMax
+	}
 }
 
 func main() {
-	shard, err := knowdy.New(ShardConfig, runtime.GOMAXPROCS(0))
+	shard, err := knowdy.New(KndConfig, cfg.GltAddress, runtime.GOMAXPROCS(0))
 	if err != nil {
 		log.Fatalln("could not create knowdy shard, error:", err)
 	}
@@ -112,6 +113,7 @@ func main() {
 
 	router := http.NewServeMux()
 	router.Handle("/gsl", measurer(authorization(limiter(gslHandler(shard), cfg.RequestsMax, cfg.SlotAwaitDuration))))
+	router.Handle("/msg", measurer(authorization(limiter(msgHandler(shard), cfg.RequestsMax, cfg.SlotAwaitDuration))))
 	router.Handle("/metrics", metricsHandler)
 
 	server := &http.Server{
@@ -182,8 +184,11 @@ func authorization(h http.Handler) http.Handler {
 			http.Error(w, "unauthorized", http.StatusUnauthorized)
 			return
 		}
-		log.Println("authorized:", token.Claims)
-		h.ServeHTTP(w, r)
+		log.Println("++ authorized:", token.Claims)
+		//claims := token.Claims.(jwt.MapClaims)
+		// log.Printf("Token for user %s expires %v", claims["email"], claims["exp"])
+		ctx := context.WithValue(r.Context(), "token", token)
+		h.ServeHTTP(w, r.WithContext(ctx))
 	})
 }
 
@@ -212,5 +217,32 @@ func gslHandler(shard *knowdy.Shard) http.Handler {
 			metrics.Success = true
 			metrics.TaskType = taskType
 		}
+	})
+}
+
+func msgHandler(shard *knowdy.Shard) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodGet {
+			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+			return
+		}
+		t, ok := r.URL.Query()["t"]
+		if !ok || len(t) < 1 {
+			http.Error(w, "URL param t is missing", http.StatusBadRequest)
+			return
+		}
+		result, _, err := shard.ReadMsg(t[0], r.Context().Value("token").(*jwt.Token))
+		if err != nil {
+			http.Error(w, "internal server error", http.StatusInternalServerError)
+			return
+		}
+
+		w.Header().Set("Content-Type", "application/json")
+		fmt.Fprint(w, result)
+
+		//if metrics, ok := r.Context().Value(metricsKey).(*Metrics); ok {
+		//	metrics.Success = true
+		//	metrics.TaskType = taskType
+		//}
 	})
 }
