@@ -27,6 +27,7 @@ COPY ./examples /etc/gnode/
 COPY ./schemas /etc/gnode/schemas
 
 COPY --from=builder /tmp/gnode /usr/bin/
+COPY --from=builder /tmp/coverage.out /tmp
 
 EXPOSE 8080
 CMD ["gnode", "--listen-address=0.0.0.0:8080", "--config-path=/etc/gnode/gnode.json"]
