@@ -1,0 +1,20 @@
+{schema Basic
+
+    (class Communication Channel
+        [gloss
+            {en_EN communication channel}
+            {ru_RU канал коммуникации с персоной}
+         ]
+        (aggr audio {c Voice Communication Channel})
+    )
+
+    (class Voice Communication Channel
+        [gloss
+           {en_EN voice communication channel}
+           {ru_RU голосовой канал связи}
+        ]
+    )
+
+}
+
+

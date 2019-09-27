@@ -1,0 +1,14 @@
+{schema knd-basic
+
+{!class Speaker
+    {is Agent}}
+
+{!class Addressee
+    {is Agent}}
+
+{!class Message
+    {is Information}}
+
+{!class Message Topic
+    {is Information}}
+}

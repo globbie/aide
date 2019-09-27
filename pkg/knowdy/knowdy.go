@@ -96,7 +96,8 @@ func (s *Shard) ReadMsg(msg string, token *jwt.Token) (string, string, error) {
 	if err != nil {
 		return "", "", errors.New("text decoding failed")
 	}
-	log.Println("GSL:", graph)
+
+        log.Println("GSL:", graph)
 
 	reply, err := EncodeText(graph, "RU SyNode CS", s.gltAddress)
 	if err != nil {
@@ -104,5 +105,5 @@ func (s *Shard) ReadMsg(msg string, token *jwt.Token) (string, string, error) {
 	}
 	log.Println("REPLY:", reply, " err:", err)
 
-	return "OK", "msg", nil
+	return reply, "msg", nil
 }

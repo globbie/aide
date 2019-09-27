@@ -1,0 +1,28 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: gnode
+spec:
+  selector:
+    matchLabels:
+      app: gnode
+      tier: backend
+  replicas: 2
+  template:
+    metadata:
+      labels:
+        app: gnode
+        tier: backend
+    spec:
+      containers:
+      - name: gnode
+        image: gnode:0.0.1
+        resources:
+          limits:
+            memory: "300Mi"
+          requests:
+            memory: "250Mi"
+        ports:
+          - name: http
+            containerPort: 80
+        imagePullPolicy: Never

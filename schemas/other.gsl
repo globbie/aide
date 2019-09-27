@@ -1,0 +1,9 @@
+{schema knd-basic
+
+  (class Dry Tea Leaves
+         [_gloss {ru листовой чай}])
+
+  (class Boiling Water
+         [_gloss {ru кипяток}])
+
+}

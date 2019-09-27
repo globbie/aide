@@ -1,0 +1,68 @@
+{schema knd-basic
+
+{!class Spatial Position
+    [_gloss {ru {t пространственное положение}}]
+    {is Abstraction}
+}
+
+{!class Quantity
+    [_gloss {ru {t количественная характеристика объекта}}]
+    {is Abstraction}
+}
+
+{!class Substance Quantity
+    [_gloss {ru {t количественная характеристика вещества}}]
+    {is Quantity}
+    {!num mass}
+    {!ref unitref {!c Mass Measure Unit}}}
+
+{!class Countable Quantity
+    [_gloss {ru {t количественная характеристика счетных объектов}}]
+    {is Quantity}
+    {!num count} }
+
+{!class Physical Mass Quantity
+    [_gloss {ru {t масса физического тела}}]
+    {is Abstraction}
+    {!str calc}
+    {-- !ref measure-proc {c Mass Measurement Procedure} --}
+    {!num mass {!impl}}
+    {!num count}
+    {!str unit}
+    {!ref unitref {!c Mass Measure Unit}}}
+
+{-- {!proc Compute Physical Mass
+    [_gloss {ru {t расчет физической массы объекта}}]
+    {result {c Substance Quantity}}
+    [!arg {obj  {c Physical Object}}
+          {q    {c Quantity}}]
+    {switch q
+            {base Substance Quantity
+                  {q{mass}} }
+            {base Countable Quantity
+                  {run _mult
+                      {quant {obj{mass}}}
+                      {times {q{count}}}} }} }
+--}
+
+{!class Mass Measure Unit
+    [_gloss {ru {t единица измерения массы}}]
+    {is Abstraction}}
+
+{!class Gram
+    [_gloss {ru {t грамм}}]
+    {is Mass Measure Unit}}
+
+{!class Liter
+    [_gloss {ru {t литр}}]
+    {is Mass Measure Unit}}
+
+{!class Spatial Location
+    [_gloss {ru {t локализация физического тела в пространстве}}]
+    {is Abstraction}
+    {!ref origin {c Physical Object}}
+    {str x}
+    {str y}
+    {str z}}
+
+}

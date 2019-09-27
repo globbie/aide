@@ -48,8 +48,8 @@ func init() {
 	)
 
 	flag.StringVar(&configPath, "config-path", "/etc/gnode/gnode.json", "path to Gnode config")
-	flag.StringVar(&kndConfigPath, "knd-config-path", "/etc/knowdy/shard.gsl", "path to Knowdy config")
-	flag.StringVar(&listenAddress, "listen-address", "localhost:8088", "Gnode listen address")
+	flag.StringVar(&kndConfigPath, "knd-config-path", "/etc/gnode/shard.gsl", "path to Knowdy config")
+	flag.StringVar(&listenAddress, "listen-address", "0.0.0.0:8080", "Gnode listen address")
 	flag.IntVar(&requestsMax, "requests-limit", 10, "maximum number of requests to process simultaneously")
 	flag.DurationVar(&duration, "request-limit-duration", 1*time.Second, "free slot awaiting time")
 	flag.Parse()
@@ -184,7 +184,6 @@ func authorization(h http.Handler) http.Handler {
 			http.Error(w, "unauthorized", http.StatusUnauthorized)
 			return
 		}
-		log.Println("++ authorized:", token.Claims)
 		//claims := token.Claims.(jwt.MapClaims)
 		// log.Printf("Token for user %s expires %v", claims["email"], claims["exp"])
 		ctx := context.WithValue(r.Context(), "token", token)
