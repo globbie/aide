@@ -9,12 +9,10 @@ RUN dep ensure -v --vendor-only
 
 RUN ./build_knowdy.sh
 
-# todo: move it to the base image
 RUN go get ./...
-RUN go get github.com/mattn/goveralls
+RUN go build -o gnode cmd/gnode/*.go
 RUN go test -v -covermode=count -coverprofile=coverage.out ./...
 
-RUN go build -o gnode cmd/gnode/*.go
 RUN cp gnode /tmp/
 RUN cp coverage.out /tmp/
 
