@@ -8,5 +8,5 @@ id=$(docker create globbie/gnode:$TAG)
 docker cp ${id}:/tmp/coverage.out .
 docker rm -v ${id}
 
-cat /tmp/coverage.out
+cat coverage.out
 echo $COVERALLS_TOKEN
