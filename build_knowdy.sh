@@ -1,4 +1,4 @@
-#!/usr/bin/env bash
+#!/usr/bin/env sh
 
 ROOT_DIR="$(dirname "$PWD/$0")"
 

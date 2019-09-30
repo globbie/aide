@@ -11,10 +11,9 @@ RUN ./build_knowdy.sh
 
 RUN go get ./...
 RUN go build -o gnode cmd/gnode/*.go
-RUN go test -v -covermode=count -coverprofile=coverage.out ./...
+RUN go test -v -covermode=count -coverprofile=/tmp/coverage.out ./...
 
 RUN cp gnode /tmp/
-RUN cp coverage.out /tmp/
 
 # package stage
 FROM alpine:latest
@@ -26,6 +25,9 @@ COPY ./schemas /etc/gnode/schemas
 
 COPY --from=builder /tmp/gnode /usr/bin/
 COPY --from=builder /tmp/coverage.out /tmp
+
+RUN adduser -D gnode
+USER gnode
 
 EXPOSE 8080
 CMD ["gnode", "--listen-address=0.0.0.0:8080", "--config-path=/etc/gnode/gnode.json"]
