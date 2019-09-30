@@ -1,0 +1,39 @@
+FROM alpine:3.8 as builder
+RUN apk --update add \
+    go \
+    dep \
+    cmake \
+    make \
+    check \
+    check-dev \
+    git \
+    musl-dev
+RUN apk --update add \
+    util-linux-dev
+
+ENV GOROOT /usr/lib/go
+ENV GOPATH /go
+ENV PATH /go/bin:$PATH
+
+RUN mkdir -p ${GOPATH}/src ${GOPATH}/bin
+
+ENV D=$GOPATH/src/github.com/globbie/gnode
+ADD . $D/
+WORKDIR $D
+RUN dep ensure -v --vendor-only
+RUN ./build_knowdy.sh
+
+RUN go get ./...
+RUN go build -o gnode -ldflags "-linkmode external -extldflags '-static' -s -w" cmd/gnode/*.go
+RUN cp gnode /tmp
+
+FROM scratch
+
+WORKDIR /etc/gnode/schemas
+COPY ./examples /etc/gnode/
+COPY ./schemas /etc/gnode/schemas
+
+COPY --from=builder /tmp/gnode /
+
+EXPOSE 8080
+CMD ["/gnode", "--listen-address=0.0.0.0:8080", "--config-path=/etc/gnode/gnode.json"]
