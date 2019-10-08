@@ -1,9 +1,9 @@
 {schema knd
       {db-path /var/lib/knowdy/db}
-      {schema-path /etc/gnode/schemas
+      {schema-path /etc/knowdy/schemas
            {user User
                {base-repo shared-repo-name
-                   {schema-path /etc/gnode/schemas}}}}
+                   {schema-path /etc/knowdy/schemas}}}}
     {memory
          {max_base_pages        20000}
          {max_small_x4_pages    4500}

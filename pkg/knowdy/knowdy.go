@@ -15,7 +15,6 @@ package knowdy
 import "C"
 import (
 	"errors"
-	"github.com/dgrijalva/jwt-go"
 	"log"
 	"unsafe"
 )
@@ -87,23 +86,29 @@ func (s *Shard) RunTask(task string, task_len int) (string, string, error) {
 	return C.GoStringN((*C.char)(worker.output), C.int(worker.output_size)), taskTypeToStr(C.int(0)), nil
 }
 
-func (s *Shard) ReadMsg(msg string, token *jwt.Token) (string, string, error) {
-	claims := token.Claims.(jwt.MapClaims)
-
-	log.Println("MSG:", msg, " from:", claims["email"])
-
-	graph, err := DecodeText(msg, s.gltAddress)
+func (s *Shard) ProcessMsg(msg string, lang string) (string, string, error) {
+	graph, err := s.DecodeText(msg, lang)
 	if err != nil {
-		return "", "", errors.New("text decoding failed")
+		log.Println(err.Error())
+		return "", "", errors.New("text decoding failed :: " + err.Error())
+        }
+
+        // parse GSL, build msg tree
+
+        // decide what action is needed
+
+        // exec if it's a lightweight / no cost task
+        // all heavy / complex / costly  tasks require prior approval from the User
+        // these are started from the /gsl endpoint only
+
+        // confirm desired task, send task restatement + quick results if any
+
+        // send task report
+
+        reply, err := s.EncodeText(graph, lang)
+	if err != nil {
+		return "", "", errors.New("text encoding failed :: " + err.Error())
 	}
 
-        log.Println("GSL:", graph)
-
-	reply, err := EncodeText(graph, "RU SyNode CS", s.gltAddress)
-	if err != nil {
-		return "", "", errors.New("text encoding failed")
-	}
-	log.Println("REPLY:", reply, " err:", err)
-
-	return reply, "msg", nil
+	return "{\"reply\": \"" + reply + "\"}", "msg", nil
 }

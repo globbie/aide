@@ -2,58 +2,52 @@ package knowdy
 
 import (
 	"bytes"
-	"fmt"
 	"io/ioutil"
+	"log"
 	"net/http"
 	"net/url"
+	"time"
 )
 
-func DecodeText(text string, addr string) (string, error) {
-	Url, err := url.Parse("http://" + addr)
-	if err != nil {
-		panic("invalid URL")
-	}
-	Url.Path = "/text-to-graph"
+func (s *Shard) DecodeText(text string, lang string) (string, error) {
+	u := url.URL{Scheme: "http", Host: s.gltAddress, Path: "/text-to-graph"}
 	parameters := url.Values{}
 	parameters.Add("t", text)
-	Url.RawQuery = parameters.Encode()
+	parameters.Add("lang", lang)
+	u.RawQuery = parameters.Encode()
 
-	fmt.Printf("Encoded URL is %q\n", Url.String())
+	var netClient = &http.Client{
+		Timeout: time.Second * 7,
+	}
 
-	resp, err := http.Get(Url.String())
+	resp, err := netClient.Get(u.String())
 	if err != nil {
-		panic(err)
+		log.Println(err.Error())
+		return "", err
 	}
 	defer resp.Body.Close()
 
-	fmt.Println("response Status:", resp.Status)
-	fmt.Println("response Headers:", resp.Header)
 	body, _ := ioutil.ReadAll(resp.Body)
-	fmt.Println("response Body:", string(body))
 
 	return string(body), nil
 }
 
-func EncodeText(graph string, codeSystem string, addr string) (string, error) {
-	Url, err := url.Parse("http://" + addr)
-	if err != nil {
-		panic("invalid URL")
-	}
-	Url.Path = "/graph-to-text"
+func (s *Shard) EncodeText(graph string, lang string) (string, error) {
+	u := url.URL{Scheme: "http", Host: s.gltAddress, Path: "/graph-to-text"}
 	parameters := url.Values{}
-	parameters.Add("cs", codeSystem)
-	Url.RawQuery = parameters.Encode()
+	parameters.Add("cs", lang)
+	u.RawQuery = parameters.Encode()
 
-	fmt.Printf("== URL is %q  Graph:%q\n", Url.String(), graph)
+	var netClient = &http.Client{
+		Timeout: time.Second * 10,
+	}
 
-	resp, err := http.Post(Url.String(), "text/plain; charset=utf-8", bytes.NewBuffer([]byte(graph)))
+	resp, err := netClient.Post(u.String(), "text/plain; charset=utf-8", bytes.NewBuffer([]byte(graph)))
 	if err != nil {
-		panic(err)
+		return "", err
 	}
 	defer resp.Body.Close()
 
-	fmt.Println("response Status:", resp.Status)
-	fmt.Println("response Headers:", resp.Header)
 	body, _ := ioutil.ReadAll(resp.Body)
 
 	return string(body), nil

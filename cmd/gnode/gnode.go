@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"flag"
 	"fmt"
+	"io"
 	"io/ioutil"
 	"log"
 	"net/http"
@@ -47,9 +48,9 @@ func init() {
 		duration      time.Duration
 	)
 
-	flag.StringVar(&configPath, "config-path", "/etc/gnode/gnode.json", "path to Gnode config")
+	flag.StringVar(&configPath,    "config-path", "/etc/gnode/gnode.json", "path to Gnode config")
 	flag.StringVar(&kndConfigPath, "knd-config-path", "/etc/gnode/shard.gsl", "path to Knowdy config")
-	flag.StringVar(&listenAddress, "listen-address", "0.0.0.0:8080", "Gnode listen address")
+	flag.StringVar(&listenAddress, "listen-address", "", "Gnode listen address")
 	flag.IntVar(&requestsMax, "requests-limit", 10, "maximum number of requests to process simultaneously")
 	flag.DurationVar(&duration, "request-limit-duration", 1*time.Second, "free slot awaiting time")
 	flag.Parse()
@@ -107,13 +108,14 @@ func init() {
 func main() {
 	shard, err := knowdy.New(KndConfig, cfg.GltAddress, runtime.GOMAXPROCS(0))
 	if err != nil {
-		log.Fatalln("could not create knowdy shard, error:", err)
+		log.Fatalln("could not create kndShard, error:", err)
 	}
 	defer shard.Del()
 
 	router := http.NewServeMux()
-	router.Handle("/gsl", measurer(authorization(limiter(gslHandler(shard), cfg.RequestsMax, cfg.SlotAwaitDuration))))
-	router.Handle("/msg", measurer(authorization(limiter(msgHandler(shard), cfg.RequestsMax, cfg.SlotAwaitDuration))))
+	router.Handle("/gsl", measurer(authorization(limiter(gslHandler(shard),
+		cfg.RequestsMax, cfg.SlotAwaitDuration))))
+	router.Handle("/msg", measurer(limiter(msgHandler(shard), cfg.RequestsMax, cfg.SlotAwaitDuration)))
 	router.Handle("/metrics", metricsHandler)
 
 	server := &http.Server{
@@ -142,7 +144,7 @@ func main() {
 		close(done)
 	}()
 
-	log.Println("server is ready to handle requests at:", cfg.ListenAddress)
+	log.Println("Gnode server is ready to handle requests at:", cfg.ListenAddress)
 
 	err = server.ListenAndServe()
 	if err != nil && err != http.ErrServerClosed {
@@ -230,14 +232,26 @@ func msgHandler(shard *knowdy.Shard) http.Handler {
 			http.Error(w, "URL param t is missing", http.StatusBadRequest)
 			return
 		}
-		result, _, err := shard.ReadMsg(t[0], r.Context().Value("token").(*jwt.Token))
+
+		lang, ok := r.URL.Query()["lang"]
+		if !ok || len(t) < 1 {
+			http.Error(w, "URL param lang is missing", http.StatusBadRequest)
+			return
+		}
+
+		// r.Context().Value("token").(*jwt.Token)
+		result, _, err := shard.ProcessMsg(t[0], lang[0])
 		if err != nil {
+			log.Println(err.Error())
 			http.Error(w, "internal server error", http.StatusInternalServerError)
 			return
 		}
 
+		// allow connections from web apps
+		w.Header().Set("Access-Control-Allow-Origin", "*")
+		w.Header().Set("Access-Control-Allow-Headers", "Content-Type")
 		w.Header().Set("Content-Type", "application/json")
-		fmt.Fprint(w, result)
+		_, _ = io.WriteString(w, result)
 
 		//if metrics, ok := r.Context().Value(metricsKey).(*Metrics); ok {
 		//	metrics.Success = true
