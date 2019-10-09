@@ -10,8 +10,10 @@ RUN dep ensure -v --vendor-only
 RUN ./build_knowdy.sh
 
 RUN go get ./...
+RUN go get github.com/mattn/goveralls
 RUN go build -o gnode cmd/gnode/*.go
-RUN go test -v -covermode=count -coverprofile=/tmp/coverage.out ./...
+RUN go test -v -covermode=count -coverprofile=coverage.out ./...
+RUN $GOPATH/bin/goveralls -coverprofile=coverage.out -service=travis-ci
 
 RUN cp gnode /tmp/
 
@@ -21,13 +23,16 @@ RUN apk add --no-cache libc6-compat
 
 WORKDIR /etc/gnode/schemas
 COPY ./examples /etc/gnode/
-COPY ./schemas /etc/gnode/schemas
+
+WORKDIR /etc/knowdy/schemas
+COPY ./schemas /etc/knowdy/schemas
 
 COPY --from=builder /tmp/gnode /usr/bin/
-COPY --from=builder /tmp/coverage.out /tmp
 
-RUN adduser -D gnode
-USER gnode
+RUN adduser -D knowdy
+WORKDIR /var/lib/knowdy/db
+RUN chown -R knowdy /var/lib/knowdy
+USER knowdy
 
 EXPOSE 8080
 CMD ["gnode", "--listen-address=0.0.0.0:8080", "--config-path=/etc/gnode/gnode.json"]
