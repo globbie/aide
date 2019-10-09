@@ -3,7 +3,6 @@ delenda
 *~
 */*~
 .git*
-cmd/gnode/gnode
 pkg/knowdy/knowdy/.git
 pkg/knowdy/knowdy/build
 pkg/knowdy/knowdy/libs/gsl-parser/.git

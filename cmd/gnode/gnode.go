@@ -235,7 +235,7 @@ func msgHandler(shard *knowdy.Shard) http.Handler {
 			return
 		}
 		if err := r.ParseForm(); err != nil {
-			http.Error(w, "URL parsing error", http.StatusBadRequest)
+			http.Error(w, "URL format error: " + err.Error(), http.StatusBadRequest)
 			return
 		}
 
@@ -248,8 +248,7 @@ func msgHandler(shard *knowdy.Shard) http.Handler {
 		// r.Context().Value("token").(*jwt.Token)
 		result, _, err := shard.ProcessMsg(msg.SessionId, msg.Content, msg.Lang)
 		if err != nil {
-			log.Println(err.Error())
-			http.Error(w, "internal server error", http.StatusInternalServerError)
+			http.Error(w, "internal server error: " + err.Error(), http.StatusInternalServerError)
 			return
 		}
 

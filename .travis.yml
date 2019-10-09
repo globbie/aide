@@ -9,8 +9,8 @@ branches:
   except:
   - "/^*-v[0-9]/"
   - /^gnode-.*$/
-#install:
-#- go get github.com/mattn/goveralls
+install:
+- go get github.com/mattn/goveralls
 script:
 - export GIT_TAG=$TRAVIS_BRANCH-$TRAVIS_BUILD_NUMBER
 - export TAG=`if [ "$TRAVIS_BRANCH" == "master" ]; then echo "latest"; else echo $TRAVIS_BRANCH; fi`
