@@ -16,6 +16,7 @@ import "C"
 import (
 	"errors"
 	"log"
+	"strings"
 	"unsafe"
 )
 
@@ -86,7 +87,8 @@ func (s *Shard) RunTask(task string, task_len int) (string, string, error) {
 	return C.GoStringN((*C.char)(worker.output), C.int(worker.output_size)), taskTypeToStr(C.int(0)), nil
 }
 
-func (s *Shard) ProcessMsg(msg string, lang string) (string, string, error) {
+func (s *Shard) ProcessMsg(sid string, msg string, lang string) (string, string, error) {
+	
 	graph, err := s.DecodeText(msg, lang)
 	if err != nil {
 		log.Println(err.Error())
@@ -110,5 +112,12 @@ func (s *Shard) ProcessMsg(msg string, lang string) (string, string, error) {
 		return "", "", errors.New("text encoding failed :: " + err.Error())
 	}
 
-	return "{\"reply\": \"" + reply + "\"}", "msg", nil
+	var str strings.Builder
+	str.WriteString("{\"sid\":\"")
+	str.WriteString(sid)
+	str.WriteString("\"")
+	str.WriteString(",\"reply\":\"")
+	str.WriteString(reply)
+	str.WriteString("\"}")
+	return str.String(), "msg", nil
 }

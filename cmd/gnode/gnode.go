@@ -17,6 +17,7 @@ import (
 
 	"github.com/dgrijalva/jwt-go"
 	"github.com/dgrijalva/jwt-go/request"
+        "github.com/gorilla/schema"
 
 	"github.com/globbie/gnode/pkg/knowdy"
 )
@@ -29,6 +30,12 @@ type Config struct {
 	SlotAwaitDuration time.Duration `json:"slot-await-duration"`
 
 	VerifyKeyPath string `json:"verify-key-path"`
+}
+
+type Msg struct {
+	Content   string `schema:"t,required"`
+	Lang      string `schema:"lang,required"`
+	SessionId string `schema:"sid,required"`
 }
 
 var (
@@ -48,7 +55,7 @@ func init() {
 		duration      time.Duration
 	)
 
-	flag.StringVar(&configPath,    "config-path", "/etc/gnode/gnode.json", "path to Gnode config")
+	flag.StringVar(&configPath, "config-path", "/etc/gnode/gnode.json", "path to Gnode config")
 	flag.StringVar(&kndConfigPath, "knd-config-path", "/etc/gnode/shard.gsl", "path to Knowdy config")
 	flag.StringVar(&listenAddress, "listen-address", "", "Gnode listen address")
 	flag.IntVar(&requestsMax, "requests-limit", 10, "maximum number of requests to process simultaneously")
@@ -227,20 +234,19 @@ func msgHandler(shard *knowdy.Shard) http.Handler {
 			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
 			return
 		}
-		t, ok := r.URL.Query()["t"]
-		if !ok || len(t) < 1 {
-			http.Error(w, "URL param t is missing", http.StatusBadRequest)
+		if err := r.ParseForm(); err != nil {
+			http.Error(w, "URL parsing error", http.StatusBadRequest)
 			return
 		}
 
-		lang, ok := r.URL.Query()["lang"]
-		if !ok || len(t) < 1 {
-			http.Error(w, "URL param lang is missing", http.StatusBadRequest)
+		msg := new(Msg)
+		if err := schema.NewDecoder().Decode(msg, r.Form); err != nil {
+			http.Error(w, "URL error: " + err.Error(), http.StatusBadRequest)
 			return
 		}
 
 		// r.Context().Value("token").(*jwt.Token)
-		result, _, err := shard.ProcessMsg(t[0], lang[0])
+		result, _, err := shard.ProcessMsg(msg.SessionId, msg.Content, msg.Lang)
 		if err != nil {
 			log.Println(err.Error())
 			http.Error(w, "internal server error", http.StatusInternalServerError)
