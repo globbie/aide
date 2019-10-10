@@ -1,7 +1,7 @@
 FROM globbie/build as builder
+ARG COVERALLS_TOKEN
 
 ENV D=$GOPATH/src/github.com/globbie/gnode
-
 ADD . $D/
 WORKDIR $D
 
@@ -13,7 +13,7 @@ RUN go get ./...
 RUN go get github.com/mattn/goveralls
 RUN go build -o gnode cmd/gnode/*.go
 RUN go test -v -covermode=count -coverprofile=coverage.out ./...
-RUN $GOPATH/bin/goveralls -coverprofile=coverage.out -service=travis-ci
+RUN $GOPATH/bin/goveralls -coverprofile=coverage.out -service=travis-ci -repotoken=$COVERALLS_TOKEN
 
 RUN cp gnode /tmp/
 
