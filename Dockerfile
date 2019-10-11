@@ -9,10 +9,9 @@ ENV D=$GOPATH/src/github.com/globbie/gnode
 ADD . $D/
 WORKDIR $D
 
-RUN dep ensure -v --vendor-only
-
 RUN ./build_knowdy.sh
 
+RUN dep ensure -v --vendor-only
 RUN go get ./...
 RUN go get golang.org/x/tools/cmd/cover
 RUN go get github.com/mattn/goveralls
