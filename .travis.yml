@@ -1,6 +1,3 @@
-language: go
-go:
-- 1.11.x
 services:
 - docker
 git:
