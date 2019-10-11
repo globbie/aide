@@ -7,8 +7,6 @@ KNOWDY_BUILD="${KNOWDY_SRC}/build"
 
 [ -d "${KNOWDY_SRC}" ] || (echo "knowdy not found" && exit 1)
 
-ls -ltr "${KNOWDY_BUILD}"
-
 if [ ! -d "${KNOWDY_BUILD}" ]; then
     mkdir "${KNOWDY_BUILD}" && cd "${KNOWDY_BUILD}"
     cmake "${KNOWDY_SRC}" -DCMAKE_BUILD_TYPE=Release -DCMAKE_C_COMPILER=`go env CC`

@@ -1,5 +1,9 @@
 FROM globbie/build as builder
-ARG COVERALLS_TOKEN
+ARG TRAVIS_JOB_ID
+ARG TRAVIS_BRANCH
+
+ENV TRAVIS_JOB_ID $TRAVIS_JOB_ID
+ENV TRAVIS_BRANCH $TRAVIS_BRANCH
 
 ENV D=$GOPATH/src/github.com/globbie/gnode
 ADD . $D/
@@ -10,10 +14,13 @@ RUN dep ensure -v --vendor-only
 RUN ./build_knowdy.sh
 
 RUN go get ./...
+RUN go get golang.org/x/tools/cmd/cover
 RUN go get github.com/mattn/goveralls
+
+RUN echo " branch: " $TRAVIS_BRANCH " job: " $TRAVIS_JOB 
 RUN go build -o gnode cmd/gnode/*.go
 RUN go test -v -covermode=count -coverprofile=coverage.out ./...
-RUN $GOPATH/bin/goveralls -coverprofile=coverage.out -service=travis-ci -repotoken=$COVERALLS_TOKEN
+RUN $GOPATH/bin/goveralls -coverprofile=coverage.out -v -service=travis-ci
 
 RUN cp gnode /tmp/
 
