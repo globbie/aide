@@ -13,7 +13,7 @@ func TestDecodeTextTimeout(t *testing.T) {
 		gltAddress: "localhost",
 		workers:    nil,
 	}
-	graph, err := shard.DecodeText("banana", "EN SyNode CS")
+	_, err := shard.DecodeText("banana", "EN SyNode CS")
 	if err == nil {
 		t.Error(err)
 	}
