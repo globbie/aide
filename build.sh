@@ -2,18 +2,9 @@
 
 set -e
 
-docker build -t tmp -f Dockerfile.build .
+docker build -t globbie/gnode:$TAG --build-arg TRAVIS_JOB_ID=$TRAVIS_JOB_ID --build-arg TRAVIS_BRANCH=$TRAVIS_BRANCH .
 
-id=$(docker create tmp)
-
-docker cp ${id}:/tmp/gnode .
-docker cp ${id}:/tmp/schemas .
-docker cp ${id}:/tmp/coverage.out .
-
+id=$(docker create globbie/gnode:$TAG)
+docker cp ${id}:/usr/bin/gnode .
 docker rm -v ${id}
-docker rmi tmp
 
-docker build -t globbie/gnode:$TAG .
-
-#rm gnode
-#rm -rf schemas

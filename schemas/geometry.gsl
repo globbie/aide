@@ -1,0 +1,8 @@
+{schema knd-basic
+
+{!class Geometry Shape
+        [_gloss {ru {t форма объекта}}]
+    {is Abstraction}
+}
+
+}

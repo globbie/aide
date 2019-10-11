@@ -1,0 +1,38 @@
+{schema knd
+
+{!class Internet Domain Name
+     [!_gloss {ru {t доменное имя}}]
+     {is Information}}
+
+{!class URL
+     [!_gloss {ru {t идентификатор информационного ресурса}}]
+     {is Information}
+     {!str auth}
+     {!str protocol}
+     {!str path}
+     {!str options}
+     {!str port}}
+
+{!class Web Link
+     [!_gloss {ru {t идентификатор информационного ресурса}}]
+     {is URL}
+     {!str url}}
+
+{!class Email Address
+    [!_gloss {ru {t адрес электронной почты}}]
+    {is Information}
+    {str username}
+    {ref domain {c Internet Domain Name}}}
+
+{!class Phone Contacts
+    [!_gloss {ru {t телефонный номер}}]
+    {is Information}
+    {str country-code}
+    {str prefix}
+    {str number}}
+
+{!class Geospatial Address
+    [!_gloss {ru {t почтовый адрес}}]
+    {is Information}}
+
+}

@@ -15,15 +15,18 @@ package knowdy
 import "C"
 import (
 	"errors"
-        "unsafe"
+	"log"
+	"strings"
+	"unsafe"
 )
 
 type Shard struct {
-	shard   *C.struct_kndShard
-	workers chan *C.struct_kndTask
+	shard      *C.struct_kndShard
+	gltAddress string
+	workers    chan *C.struct_kndTask
 }
 
-func New(conf string, concurrencyFactor int) (*Shard, error) {
+func New(conf string, gltAddress string, concurrencyFactor int) (*Shard, error) {
 	var shard *C.struct_kndShard = nil
 	errCode := C.knd_shard_new((**C.struct_kndShard)(&shard), C.CString(conf), C.size_t(len(conf)))
 	if errCode != C.int(0) {
@@ -31,8 +34,9 @@ func New(conf string, concurrencyFactor int) (*Shard, error) {
 	}
 
 	proc := Shard{
-		shard:   shard,
-		workers: make(chan *C.struct_kndTask, concurrencyFactor),
+		shard:      shard,
+		gltAddress: gltAddress,
+		workers:    make(chan *C.struct_kndTask, concurrencyFactor),
 	}
 
 	for i := 0; i < concurrencyFactor; i++ {
@@ -73,12 +77,47 @@ func (s *Shard) RunTask(task string, task_len int) (string, string, error) {
 	worker.ctx = &ctx
 	C.knd_task_reset(worker)
 
-        cs := C.CString(task)
-        defer C.free(unsafe.Pointer(cs))
+	cs := C.CString(task)
+	defer C.free(unsafe.Pointer(cs))
 
-        errCode := C.knd_task_run(worker, cs, C.size_t(task_len))
+	errCode := C.knd_task_run(worker, cs, C.size_t(task_len))
 	if errCode != C.int(0) {
 		return "", "", errors.New("task execution failed")
 	}
 	return C.GoStringN((*C.char)(worker.output), C.int(worker.output_size)), taskTypeToStr(C.int(0)), nil
+}
+
+func (s *Shard) ProcessMsg(sid string, msg string, lang string) (string, string, error) {
+	
+	graph, err := s.DecodeText(msg, lang)
+	if err != nil {
+		log.Println(err.Error())
+		return "", "", errors.New("text decoding failed :: " + err.Error())
+        }
+
+        // parse GSL, build msg tree
+
+        // decide what action is needed
+
+        // exec if it's a lightweight / no cost task
+        // all heavy / complex / costly  tasks require prior approval from the User
+        // these are started from the /gsl endpoint only
+
+        // confirm desired task, send task restatement + quick results if any
+
+        // send task report
+
+        reply, err := s.EncodeText(graph, lang)
+	if err != nil {
+		return "", "", errors.New("text encoding failed :: " + err.Error())
+	}
+
+	var str strings.Builder
+	str.WriteString("{\"sid\":\"")
+	str.WriteString(sid)
+	str.WriteString("\"")
+	str.WriteString(",\"reply\":\"")
+	str.WriteString(reply)
+	str.WriteString("\"}")
+	return str.String(), "msg", nil
 }

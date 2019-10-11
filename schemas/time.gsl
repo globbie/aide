@@ -1,0 +1,10 @@
+{schema knd-basic
+
+{!class Calendar Date
+[_gloss {ru {t календарная дата}}]
+    {is Information}
+    {num year}
+    {num month}
+    {num date} }
+
+}
