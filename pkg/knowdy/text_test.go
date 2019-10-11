@@ -7,17 +7,14 @@ import (
 	"testing"
 )
 
-func TestDecodeText(t *testing.T) {
+func TestDecodeTextTimeout(t *testing.T) {
 	shard := Shard{
 		shard:      nil,
 		gltAddress: "localhost",
 		workers:    nil,
 	}
 	graph, err := shard.DecodeText("banana", "EN SyNode CS")
-	if err != nil {
-		t.Error(err)
-	}
-	if graph != "{class Banana}" {
+	if err == nil {
 		t.Error(err)
 	}
 }
@@ -46,3 +43,5 @@ func TestDecodeTextSuccess(t *testing.T) {
 			graph, expected)
 	}
 }
+
+
