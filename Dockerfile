@@ -13,7 +13,7 @@ RUN go get ./...
 RUN go get golang.org/x/tools/cmd/cover
 RUN go get github.com/mattn/goveralls
 
-RUN echo " branch: " $TRAVIS_BRANCH "
+RUN echo " branch: " $TRAVIS_BRANCH
 RUN go build -o gnode cmd/gnode/*.go
 RUN go test -v -covermode=count -coverprofile=coverage.out ./...
 RUN $GOPATH/bin/goveralls -coverprofile=coverage.out -v -service=travis-ci
