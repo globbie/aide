@@ -1,8 +1,5 @@
 FROM globbie/build as builder
-ARG TRAVIS_JOB_ID
 ARG TRAVIS_BRANCH
-
-ENV TRAVIS_JOB_ID $TRAVIS_JOB_ID
 ENV TRAVIS_BRANCH $TRAVIS_BRANCH
 
 ENV D=$GOPATH/src/github.com/globbie/gnode
@@ -16,7 +13,7 @@ RUN go get ./...
 RUN go get golang.org/x/tools/cmd/cover
 RUN go get github.com/mattn/goveralls
 
-RUN echo " branch: " $TRAVIS_BRANCH " job: " $TRAVIS_JOB 
+RUN echo " branch: " $TRAVIS_BRANCH "
 RUN go build -o gnode cmd/gnode/*.go
 RUN go test -v -covermode=count -coverprofile=coverage.out ./...
 RUN $GOPATH/bin/goveralls -coverprofile=coverage.out -v -service=travis-ci
