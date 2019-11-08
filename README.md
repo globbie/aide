@@ -1,10 +1,10 @@
-# Gnode
+# Aide
 
 [![Build Status](https://travis-ci.org/globbie/gnode.svg?branch=master)](https://travis-ci.org/globbie/gnode)
 
 [![Coverage Status](https://coveralls.io/repos/github/globbie/gnode/badge.svg?branch=master)](https://coveralls.io/github/globbie/gnode?branch=master)
 
-A Golang wrapper for Knowdy.
+AI Decision Executor
 
 ## Build
 
