@@ -37,7 +37,7 @@ func New(conf string, KnowDBAddress string,  LingProcAddress string, concurrency
 	var shard *C.struct_kndShard = nil
 	errCode := C.knd_shard_new((**C.struct_kndShard)(&shard), C.CString(conf), C.size_t(len(conf)))
 	if errCode != C.int(0) {
-		return nil, errors.New("could not create shard struct")
+		return nil, errors.New("failed to create a Shard struct")
 	}
 
 	s := Shard{

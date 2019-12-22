@@ -1,0 +1,11 @@
+{schema knd-basic
+
+{!class Water Nature Object
+    [_gloss {ru {t природный водный объект}}]
+    {is Physical Object}}
+
+{!class River
+    [_gloss {ru {t река}}]
+    {is Water Nature Object}}
+
+}

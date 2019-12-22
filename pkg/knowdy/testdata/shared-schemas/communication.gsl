@@ -1,0 +1,31 @@
+{schema knd-basic
+
+{!class Communication Activity
+    {is Activity}}
+
+{!class Chat
+    {is Communication Activity}}
+
+{!class Message Author
+    {is Agent}}
+
+{!class Message Addressee
+    {is Agent}}
+
+{!class Discourse Context
+    {is Information}}
+
+{!class Message
+    {is Information}
+    {ref author    {c Message Author}}
+    {ref addressee {c Message Addressee}}
+    {ref stimulus  {c Message}}
+    {ref activity  {c Communication Activity}}
+    {text subj {idx}}
+    {text body {idx}} }
+
+{!class Chat Message
+    {is Message
+        {activity Chat}}}
+
+}

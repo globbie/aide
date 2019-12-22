@@ -1,0 +1,92 @@
+{schema knd-basic
+
+   {!proc Process
+       [_gloss {ru {t процесс как изменение реальности}}]}
+
+   {!proc Natural Process
+       [_gloss {ru {t естественный процесс}}]
+       {is Process}}
+
+   {!proc Motion
+      [_gloss {ru {t перемещение физического объекта в пространстве}}]
+      {is Process}
+      [arg {Obj       {_c Physical Object}}
+           {TargetLoc {_c Spatial Location}} ]
+      [do {_move
+             {obj      TObj}
+             {where-to TargetLoc}} ]}
+
+   {!proc Agent Driven Process
+      [_gloss {ru {t агентивный процесс}}]
+      {is Process}
+      [arg {agent {_c Agent}}]}
+
+   {!proc Transportation Process
+      [_gloss {ru {t процесс активного перемещения физического объекта}}]
+      {is  Physical Impact Process}
+      [arg {Obj       {_c Physical Object}}
+           {TargetLoc {_c Spatial Location}} ]
+      [do {_move
+             {obj      TObj}
+             {where-to TargetLoc}} ]}
+
+   {!proc Physical Impact Process
+      [_gloss {ru {t процесс физического воздействия на объект}}]
+      {is Agent Driven Process}
+      [arg {obj {_c Physical Object}}]}
+
+   {!proc Mental Process
+      [_gloss {ru {t ментальный процесс}}]
+      {is Agent Driven Process}}
+
+{--   {!proc turn on Electric Device
+        [_gloss {ru {t включить электроустройство}}]
+	{is Agent Driven Process}
+        [arg
+            {device {_c Consumer Device}}]
+        {do activate interface
+            {interface {device {power-interface}}}}}
+--}
+
+ {--  {!proc activate interface
+          [_gloss {ru {t активировать интерфейс устройства}}]
+          {is Agent Driven Process}
+          [arg
+              {interface {_c Device Interface}}]
+          {do _physical_impact
+              {_obj {interface}}}}
+--}
+
+    {!proc Creative Process
+         [_gloss {ru {t созидательный процесс}}]
+         {is     Agent Driven Process}
+         {--effect Material Object--}
+         [arg    {resource {_c Material Resource}}
+                 {method   {_c Information}}
+                 {instr    {_c Instrument}}]}
+
+    {!proc change physical state
+           [_gloss {ru {t процесс изменения физического состояния объекта}}]
+           {is     Physical Impact Process}
+           {--effect {_state {obj}}--}
+           [arg    {resource {_c Material Resource}}
+                   {instr    {_c Instrument}}]}
+
+    {!proc Food Processing
+       [_gloss {ru {t изготовление пищевого продукта}}]
+       {is Agent Driven Process}}
+
+   {!proc add physical object
+       [_gloss {ru {t добавление физического объекта}}]
+       {is Agent Driven Process}}
+
+   {!proc say
+       [_gloss {ru {t сказать}}]
+       {is Agent Driven Process}}
+
+   {!proc speak
+       [_gloss {ru {t говорить}}]
+       {is Agent Driven Process}}
+
+
+}

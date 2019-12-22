@@ -1,0 +1,24 @@
+{schema knd
+
+{!class Color
+    [_gloss {ru {t объект цветового восприятия}}]
+    {is Sensory Object}}
+
+{!class Red Color
+    [_gloss {ru {t красный цвет}}]
+    {is Color}}
+
+{!class Green Color
+    [_gloss {ru {t зеленый цвет}}]
+    {is Color}}
+
+{!class Blue Color
+    [_gloss {ru {t синий цвет}}]
+    {is Color}}
+
+{!class White Color
+    [_gloss {ru {t белый цвет}}]
+    {is Color}}
+
+
+}
