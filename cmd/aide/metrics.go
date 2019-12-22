@@ -13,12 +13,12 @@ var (
 
 	failuresTotal = prometheus.NewCounter(
 		prometheus.CounterOpts{
-			Name: "gnode_requests_failed_total",
+			Name: "aide_requests_failed_total",
 			Help: "Total number of failures.",
 		})
 	successesTotal = prometheus.NewCounterVec(
 		prometheus.CounterOpts{
-			Name: "gnode_requests_completed_total",
+			Name: "aide_requests_completed_total",
 			Help: "Total number of completed requests.",
 		},
 		[]string{
@@ -26,7 +26,7 @@ var (
 		})
 	requestsActive = prometheus.NewGauge(
 		prometheus.GaugeOpts{
-			Name: "gnode_requests_active",
+			Name: "aide_requests_active",
 			Help: "Number of active requests.",
 		})
 )

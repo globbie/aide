@@ -1,6 +1,6 @@
 FROM globbie/build
 
-ENV D=$GOPATH/src/github.com/globbie/gnode
+ENV D=$GOPATH/src/github.com/globbie/aide
 
 ADD . $D/
 WORKDIR $D
@@ -22,8 +22,8 @@ RUN go get github.com/mattn/goveralls
 RUN go test -v -covermode=count -coverprofile=coverage.out ./...
 RUN ls -l
 
-RUN go build -o gnode cmd/gnode/*.go
-RUN cp gnode /tmp/
+RUN go build -o aide cmd/aide/*.go
+RUN cp aide /tmp/
 RUN cp coverage.out /tmp/
 
 RUN mkdir -p /tmp

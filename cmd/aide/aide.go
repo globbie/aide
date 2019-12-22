@@ -19,7 +19,7 @@ import (
 	"github.com/dgrijalva/jwt-go/request"
         "github.com/gorilla/schema"
 
-	"github.com/globbie/gnode/pkg/knowdy"
+	"github.com/globbie/aide/pkg/knowdy"
 )
 
 type Config struct {
@@ -55,9 +55,9 @@ func init() {
 		duration      time.Duration
 	)
 
-	flag.StringVar(&configPath, "config-path", "/etc/gnode/gnode.json", "path to Gnode config")
-	flag.StringVar(&kndConfigPath, "knd-config-path", "/etc/gnode/shard.gsl", "path to Knowdy config")
-	flag.StringVar(&listenAddress, "listen-address", "", "Gnode listen address")
+	flag.StringVar(&configPath, "config-path", "/etc/aide/aide.json", "path to Aide config")
+	flag.StringVar(&kndConfigPath, "knd-config-path", "/etc/aide/shard.gsl", "path to Knowdy config")
+	flag.StringVar(&listenAddress, "listen-address", "", "Aide listen address")
 	flag.IntVar(&requestsMax, "requests-limit", 10, "maximum number of requests to process simultaneously")
 	flag.DurationVar(&duration, "request-limit-duration", 1*time.Second, "free slot awaiting time")
 	flag.Parse()
@@ -65,7 +65,7 @@ func init() {
 	{ // load config
 		configData, err := ioutil.ReadFile(configPath)
 		if err != nil {
-			log.Fatalln("could not read gnode config, error:", err)
+			log.Fatalln("could not read aide config, error:", err)
 		}
 		err = json.Unmarshal(configData, &cfg)
 		if err != nil {
@@ -151,7 +151,7 @@ func main() {
 		close(done)
 	}()
 
-	log.Println("Gnode server is ready to handle requests at:", cfg.ListenAddress)
+	log.Println("Aide server is ready to handle requests at:", cfg.ListenAddress)
 
 	err = server.ListenAndServe()
 	if err != nil && err != http.ErrServerClosed {
