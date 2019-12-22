@@ -70,8 +70,8 @@ func taskTypeToStr(v C.int) string {
 		return "get"
 	case C.KND_SELECT_STATE:
 		return "select"
-	case C.KND_UPDATE_STATE:
-		return "update"
+	case C.KND_COMMIT_STATE:
+		return "commit"
 	default:
 		return "unknown"
 	}
@@ -96,17 +96,11 @@ func (s *Shard) RunTask(task string, TaskLen int) (string, string, error) {
 	// check if we need to write to the master node
         switch C.int(ctx.phase) {
 	case C.KND_CONFIRM_COMMIT:
-		reply, err = s.SendMasterTask(C.GoStringN((*C.char)(worker.output), C.int(worker.output_size)))
-		if err != nil {
-			http.Error(w, "internal server error", http.StatusInternalServerError)
-			return
-		}
-		return
+		reply, err := s.SendMasterTask(C.GoStringN((*C.char)(worker.output), C.int(worker.output_size)))
+		return reply, "commit", err
 	default:
-		return
+		return C.GoStringN((*C.char)(worker.output), C.int(worker.output_size)), taskTypeToStr(C.int(0)), nil
 	}
-	
-	return C.GoStringN((*C.char)(worker.output), C.int(worker.output_size)), taskTypeToStr(C.int(0)), nil
 }
 
 func (s *Shard) SendMasterTask(GSL string) (string, error) {

@@ -1,3 +1,4 @@
 {"listen-address":"0.0.0.0:8080",
- "glt-address":"glottie",
+ "know-db-address":"knowdy",
+ "ling-proc-address":"glottie",
  "verify-key-path": "/etc/aide/key.rsa.pub"}

@@ -17,14 +17,15 @@ import (
 
 	"github.com/dgrijalva/jwt-go"
 	"github.com/dgrijalva/jwt-go/request"
-        "github.com/gorilla/schema"
+	"github.com/gorilla/schema"
 
 	"github.com/globbie/aide/pkg/knowdy"
 )
 
 type Config struct {
 	ListenAddress     string        `json:"listen-address"`
-	GltAddress        string        `json:"glt-address"`
+	KnowDBAddress     string        `json:"know-db-address"`
+	LingProcAddress   string        `json:"ling-proc-address"`
 	KndConfigPath     string        `json:"shard-config"`
 	RequestsMax       int           `json:"requests-max"`
 	SlotAwaitDuration time.Duration `json:"slot-await-duration"`
@@ -55,9 +56,9 @@ func init() {
 		duration      time.Duration
 	)
 
-	flag.StringVar(&configPath, "config-path", "/etc/aide/aide.json", "path to Aide config")
+	flag.StringVar(&configPath, "config-path", "/etc/aide/aide.json", "path to AIDE config")
 	flag.StringVar(&kndConfigPath, "knd-config-path", "/etc/aide/shard.gsl", "path to Knowdy config")
-	flag.StringVar(&listenAddress, "listen-address", "", "Aide listen address")
+	flag.StringVar(&listenAddress, "listen-address", "", "AIDE listen address")
 	flag.IntVar(&requestsMax, "requests-limit", 10, "maximum number of requests to process simultaneously")
 	flag.DurationVar(&duration, "request-limit-duration", 1*time.Second, "free slot awaiting time")
 	flag.Parse()
@@ -65,7 +66,7 @@ func init() {
 	{ // load config
 		configData, err := ioutil.ReadFile(configPath)
 		if err != nil {
-			log.Fatalln("could not read aide config, error:", err)
+			log.Fatalln("could not read AIDE config, error:", err)
 		}
 		err = json.Unmarshal(configData, &cfg)
 		if err != nil {
@@ -113,9 +114,9 @@ func init() {
 }
 
 func main() {
-	shard, err := knowdy.New(KndConfig, cfg.GltAddress, runtime.GOMAXPROCS(0))
+	shard, err := knowdy.New(KndConfig, cfg.KnowDBAddress, cfg.LingProcAddress, runtime.GOMAXPROCS(0))
 	if err != nil {
-		log.Fatalln("could not create kndShard, error:", err)
+		log.Fatalln("could not create a Shard, error:", err)
 	}
 	defer shard.Del()
 
@@ -151,7 +152,7 @@ func main() {
 		close(done)
 	}()
 
-	log.Println("Aide server is ready to handle requests at:", cfg.ListenAddress)
+	log.Println("AIDE server is ready to handle requests at:", cfg.ListenAddress)
 
 	err = server.ListenAndServe()
 	if err != nil && err != http.ErrServerClosed {
@@ -217,7 +218,7 @@ func gslHandler(shard *knowdy.Shard) http.Handler {
 			http.Error(w, "internal server error", http.StatusInternalServerError)
 			return
 		}
-
+		// TODO output formats
 		w.Header().Set("Content-Type", "application/json")
 		fmt.Fprint(w, result)
 
@@ -235,20 +236,20 @@ func msgHandler(shard *knowdy.Shard) http.Handler {
 			return
 		}
 		if err := r.ParseForm(); err != nil {
-			http.Error(w, "URL format error: " + err.Error(), http.StatusBadRequest)
+			http.Error(w, "URL format error: "+err.Error(), http.StatusBadRequest)
 			return
 		}
 
 		msg := new(Msg)
 		if err := schema.NewDecoder().Decode(msg, r.Form); err != nil {
-			http.Error(w, "URL error: " + err.Error(), http.StatusBadRequest)
+			http.Error(w, "URL error: "+err.Error(), http.StatusBadRequest)
 			return
 		}
 
 		// r.Context().Value("token").(*jwt.Token)
 		result, _, err := shard.ProcessMsg(msg.SessionId, msg.Content, msg.Lang)
 		if err != nil {
-			http.Error(w, "internal server error: " + err.Error(), http.StatusInternalServerError)
+			http.Error(w, "internal server error: "+err.Error(), http.StatusInternalServerError)
 			return
 		}
 
