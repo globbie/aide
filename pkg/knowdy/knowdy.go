@@ -1,11 +1,11 @@
 package knowdy
 
-// #cgo CFLAGS: -I${SRCDIR}/knowdy/include
-// #cgo CFLAGS: -I${SRCDIR}/knowdy/libs/gsl-parser/include
-// #cgo LDFLAGS: ${SRCDIR}/knowdy/build/lib/libknowdy_static.a
-// #cgo LDFLAGS: ${SRCDIR}/knowdy/build/libs/gsl-parser/lib/libgsl-parser_static.a
-// #include <knd_shard.h>
-// #include <knd_task.h>
+//#cgo CFLAGS: -I${SRCDIR}/knowdy/include
+//#cgo CFLAGS: -I${SRCDIR}/knowdy/libs/gsl-parser/include
+//#cgo LDFLAGS: ${SRCDIR}/knowdy/build/lib/libknowdy_static.a
+//#cgo LDFLAGS: ${SRCDIR}/knowdy/build/libs/gsl-parser/lib/libgsl-parser_static.a
+//#include <knd_shard.h>
+//#include <knd_task.h>
 // static void kndShard_del__(struct kndShard *shard)
 // {
 //     if (shard) {
@@ -13,29 +13,37 @@ package knowdy
 //     }
 // }
 import "C"
+
 import (
+	"bytes"
 	"errors"
+	"io/ioutil"
 	"log"
+	"net/http"
+	"net/url"
 	"strings"
+	"time"
 	"unsafe"
 )
 
 type Shard struct {
 	shard      *C.struct_kndShard
-	gltAddress string
+	KnowDBAddress string
+	LingProcAddress string
 	workers    chan *C.struct_kndTask
 }
 
-func New(conf string, gltAddress string, concurrencyFactor int) (*Shard, error) {
+func New(conf string, KnowDBAddress string,  LingProcAddress string, concurrencyFactor int) (*Shard, error) {
 	var shard *C.struct_kndShard = nil
 	errCode := C.knd_shard_new((**C.struct_kndShard)(&shard), C.CString(conf), C.size_t(len(conf)))
 	if errCode != C.int(0) {
 		return nil, errors.New("could not create shard struct")
 	}
 
-	proc := Shard{
-		shard:      shard,
-		gltAddress: gltAddress,
+	s := Shard{
+		shard:         shard,
+		KnowDBAddress: KnowDBAddress,
+		LingProcAddress: LingProcAddress,
 		workers:    make(chan *C.struct_kndTask, concurrencyFactor),
 	}
 
@@ -46,9 +54,9 @@ func New(conf string, gltAddress string, concurrencyFactor int) (*Shard, error) 
 			// todo(n.rodionov): call destructor
 			return nil, errors.New("could not create kndTask")
 		}
-		proc.workers <- task
+		s.workers <- task
 	}
-	return &proc, nil
+	return &s, nil
 }
 
 func (s *Shard) Del() error {
@@ -69,7 +77,7 @@ func taskTypeToStr(v C.int) string {
 	}
 }
 
-func (s *Shard) RunTask(task string, task_len int) (string, string, error) {
+func (s *Shard) RunTask(task string, TaskLen int) (string, string, error) {
 	worker := <-s.workers
 	defer func() { s.workers <- worker }()
 
@@ -80,12 +88,47 @@ func (s *Shard) RunTask(task string, task_len int) (string, string, error) {
 	cs := C.CString(task)
 	defer C.free(unsafe.Pointer(cs))
 
-	errCode := C.knd_task_run(worker, cs, C.size_t(task_len))
+	errCode := C.knd_task_run(worker, cs, C.size_t(TaskLen))
 	if errCode != C.int(0) {
 		return "", "", errors.New("task execution failed")
 	}
+
+	// check if we need to write to the master node
+        switch C.int(ctx.phase) {
+	case C.KND_CONFIRM_COMMIT:
+		reply, err = s.SendMasterTask(C.GoStringN((*C.char)(worker.output), C.int(worker.output_size)))
+		if err != nil {
+			http.Error(w, "internal server error", http.StatusInternalServerError)
+			return
+		}
+		return
+	default:
+		return
+	}
+	
 	return C.GoStringN((*C.char)(worker.output), C.int(worker.output_size)), taskTypeToStr(C.int(0)), nil
 }
+
+func (s *Shard) SendMasterTask(GSL string) (string, error) {
+	u := url.URL{Scheme: "http", Host: s.KnowDBAddress, Path: "/gsl"}
+	//parameters := url.Values{}
+	//parameters.Add("t", text)
+	//u.RawQuery = parameters.Encode()
+
+	var netClient = &http.Client{
+		Timeout: time.Second * 7,
+	}
+
+	resp, err := netClient.Post(u.String(), "text/plain; charset=utf-8", bytes.NewBuffer([]byte(GSL)))
+	if err != nil {
+		return "", err
+	}
+	defer resp.Body.Close()
+
+	body, _ := ioutil.ReadAll(resp.Body)
+	return string(body), nil
+}
+
 
 func (s *Shard) ProcessMsg(sid string, msg string, lang string) (string, string, error) {
 	

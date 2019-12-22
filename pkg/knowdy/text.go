@@ -10,7 +10,7 @@ import (
 )
 
 func (s *Shard) DecodeText(text string, lang string) (string, error) {
-	u := url.URL{Scheme: "http", Host: s.gltAddress, Path: "/text-to-graph"}
+	u := url.URL{Scheme: "http", Host: s.LingProcAddress, Path: "/text-to-graph"}
 	parameters := url.Values{}
 	parameters.Add("t", text)
 	parameters.Add("lang", lang)
@@ -33,7 +33,7 @@ func (s *Shard) DecodeText(text string, lang string) (string, error) {
 }
 
 func (s *Shard) EncodeText(graph string, lang string) (string, error) {
-	u := url.URL{Scheme: "http", Host: s.gltAddress, Path: "/graph-to-text"}
+	u := url.URL{Scheme: "http", Host: s.LingProcAddress, Path: "/graph-to-text"}
 	parameters := url.Values{}
 	parameters.Add("cs", lang)
 	u.RawQuery = parameters.Encode()
