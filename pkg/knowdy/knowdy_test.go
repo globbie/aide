@@ -26,7 +26,7 @@ const shardCfg = `
 `
 
 func TestShard(t *testing.T) {
-	shard, err := New(shardCfg, "localhost:8069", 1)
+	shard, err := New(shardCfg, "localhost:8081", "localhost:8069", 1)
 	if err != nil {
 		t.Error(err)
 	}

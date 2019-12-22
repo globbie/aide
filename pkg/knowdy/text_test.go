@@ -10,7 +10,8 @@ import (
 func TestDecodeTextTimeout(t *testing.T) {
 	shard := Shard{
 		shard:      nil,
-		gltAddress: "localhost",
+		KnowDBAddress: "localhost",
+		LingProcAddress: "localhost",
 		workers:    nil,
 	}
 	_, err := shard.DecodeText("banana", "EN SyNode CS")
@@ -27,7 +28,8 @@ func TestDecodeTextSuccess(t *testing.T) {
 
 	shard := Shard{
 		shard:      nil,
-		gltAddress: ts.URL[7:], // strip off http:// prefix
+		KnowDBAddress: "localhost",
+		LingProcAddress: ts.URL[7:], // strip off http:// prefix
 		workers:    nil,
 	}
 

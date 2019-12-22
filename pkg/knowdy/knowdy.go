@@ -105,10 +105,6 @@ func (s *Shard) RunTask(task string, TaskLen int) (string, string, error) {
 
 func (s *Shard) SendMasterTask(GSL string) (string, error) {
 	u := url.URL{Scheme: "http", Host: s.KnowDBAddress, Path: "/gsl"}
-	//parameters := url.Values{}
-	//parameters.Add("t", text)
-	//u.RawQuery = parameters.Encode()
-
 	var netClient = &http.Client{
 		Timeout: time.Second * 7,
 	}
