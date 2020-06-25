@@ -16,12 +16,11 @@ import "C"
 
 import (
 	"bytes"
+	"encoding/json"
 	"errors"
 	"io/ioutil"
-	"log"
 	"net/http"
 	"net/url"
-	"strings"
 	"time"
 	"unsafe"
 )
@@ -31,6 +30,16 @@ type Shard struct {
 	KnowDBAddress string
 	LingProcAddress string
 	workers    chan *C.struct_kndTask
+}
+
+type Message struct {
+	Sid       string   `json:"sid,omitempty"`
+	Tid       string   `json:"tid,omitempty"`
+	Discourse string   `json:"discourse,omitempty"`
+	Restate   string   `json:"restate,omitempty"`
+	Body      string   `json:"body,omitempty"`
+	Resources []string `json:"resources,omitempty"`
+	Menu      []string `json:"menu,omitempty"`
 }
 
 func New(conf string, KnowDBAddress string,  LingProcAddress string, concurrencyFactor int) (*Shard, error) {
@@ -120,12 +129,14 @@ func (s *Shard) SendMasterTask(GSL string) (string, error) {
 }
 
 
-func (s *Shard) ProcessMsg(sid string, msg string, lang string) (string, string, error) {
-	
+func (s *Shard) ProcessMsg(sid string, tid string, msg string, lang string) (string, string, error) {
 	graph, err := s.DecodeText(msg, lang)
 	if err != nil {
-		log.Println(err.Error())
 		return "", "", errors.New("text decoding failed :: " + err.Error())
+        }
+
+	if graph == "{}" {
+		return "", "", errors.New("empty graph :: " + err.Error())
         }
 
         // parse GSL, build msg tree
@@ -140,17 +151,12 @@ func (s *Shard) ProcessMsg(sid string, msg string, lang string) (string, string,
 
         // send task report
 
-        reply, err := s.EncodeText(graph, lang)
-	if err != nil {
-		return "", "", errors.New("text encoding failed :: " + err.Error())
-	}
+        // reply, err := s.EncodeText(graph, lang)
+	// if err != nil {
+	// 	return "", "", errors.New("text encoding failed :: " + err.Error())
+	//}
 
-	var str strings.Builder
-	str.WriteString("{\"sid\":\"")
-	str.WriteString(sid)
-	str.WriteString("\"")
-	str.WriteString(",\"reply\":\"")
-	str.WriteString(reply)
-	str.WriteString("\"}")
-	return str.String(), "msg", nil
+	reply := Message{sid, tid, "stm", "-- restate --", "-- reply --", []string{"a","b","c"}, []string{"one","two","three"}}
+	b, err := json.Marshal(reply)
+	return string(b), "msg", nil
 }

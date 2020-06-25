@@ -29,9 +29,10 @@ RUN cp aide /tmp
 
 FROM scratch
 
-WORKDIR /etc/aide/schemas
-COPY ./examples /etc/aide/
-COPY ./schemas /etc/aide/schemas
+WORKDIR /etc/aide
+COPY ./examples /etc/aide
+WORKDIR /etc/knowdy/schemas
+COPY ./schemas /etc/knowdy/schemas
 
 COPY --from=builder /tmp/aide /
 

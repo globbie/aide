@@ -37,6 +37,7 @@ type Msg struct {
 	Content   string `schema:"t,required"`
 	Lang      string `schema:"lang,required"`
 	SessionId string `schema:"sid,required"`
+	Tid       string `schema:"tid"`
 }
 
 var (
@@ -121,8 +122,8 @@ func main() {
 	defer shard.Del()
 
 	router := http.NewServeMux()
-	router.Handle("/gsl", measurer(authorization(limiter(gslHandler(shard),
-		cfg.RequestsMax, cfg.SlotAwaitDuration))))
+	router.Handle("/gsl", measurer(limiter(gslHandler(shard),
+		cfg.RequestsMax, cfg.SlotAwaitDuration)))
 	router.Handle("/msg", measurer(limiter(msgHandler(shard), cfg.RequestsMax, cfg.SlotAwaitDuration)))
 	router.Handle("/metrics", metricsHandler)
 
@@ -152,7 +153,8 @@ func main() {
 		close(done)
 	}()
 
-	log.Println("AIDE server is ready to handle requests at:", cfg.ListenAddress)
+	hostname, _ := os.Hostname()
+	log.Println("AIDE server is ready to handle requests at ", hostname, " ", cfg.ListenAddress)
 
 	err = server.ListenAndServe()
 	if err != nil && err != http.ErrServerClosed {
@@ -247,7 +249,7 @@ func msgHandler(shard *knowdy.Shard) http.Handler {
 		}
 
 		// r.Context().Value("token").(*jwt.Token)
-		result, _, err := shard.ProcessMsg(msg.SessionId, msg.Content, msg.Lang)
+		result, _, err := shard.ProcessMsg(msg.SessionId, msg.Tid, msg.Content, msg.Lang)
 		if err != nil {
 			http.Error(w, "internal server error: "+err.Error(), http.StatusInternalServerError)
 			return
