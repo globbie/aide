@@ -19,28 +19,85 @@ import (
 	"encoding/json"
 	"errors"
 	"io/ioutil"
+	"log"
 	"net/http"
 	"net/url"
+	"strings"
 	"time"
 	"unsafe"
 )
 
+type MenuOption struct {
+	Id       string              `json:"opt,omitempty"`
+	Title    map[string]string   `json:"title,omitempty"`
+}
+
+type ScriptPhase struct {
+	Id       string              `json:"id,omitempty"`
+	Body     map[string]string   `json:"body,omitempty"`
+	Quest    map[string]string   `json:"quest,omitempty"`
+	Menu     []MenuOption        `json:"menu,omitempty"`
+	Resources[]Resource          `json:"resources,omitempty"`
+}
+
+type Script struct {
+	Id       string                     `json:"id"`
+	ScriptPhases map[string]ScriptPhase `json:"phases,omitempty"`
+}
+
+type MsgInterp struct {
+	ScriptCtx        *ScriptCtx
+	ScriptReact      *ScriptReact
+}
+
+type ScriptReact struct {
+	Id          string     `json:"id"`
+	Triggers    []string   `json:"triggers,omitempty"`
+}
+
+type ScriptCtx struct {
+	Id           string         `json:"id"`
+	ScriptReacts  []ScriptReact `json:"scripts,omitempty"`
+}
+
+type LangCache struct {
+	Id             string               `json:"id"`
+	ScriptCtxs     []ScriptCtx          `json:"ctxs,omitempty"`
+}
+
 type Shard struct {
-	shard      *C.struct_kndShard
-	KnowDBAddress string
+	shard           *C.struct_kndShard
+	KnowDBAddress   string
 	LingProcAddress string
-	workers    chan *C.struct_kndTask
+	workers         chan *C.struct_kndTask
+	Resources       map[string]Resource
+	Scripts         map[string]Script
+	LangCaches      []LangCache
+	MsgIdx          map[string][]MsgInterp
+}
+
+type Resource struct {
+	Id       string   `json:"id"`
+	ImgId    string   `json:"img,omitempty"`
 }
 
 type Message struct {
-	Sid       string   `json:"sid,omitempty"`
-	Tid       string   `json:"tid,omitempty"`
-	Discourse string   `json:"discourse,omitempty"`
-	Restate   string   `json:"restate,omitempty"`
-	Body      string   `json:"body,omitempty"`
-	Resources []string `json:"resources,omitempty"`
-	Menu      []string `json:"menu,omitempty"`
+	Sid       string              `json:"sid,omitempty"`
+	Tid       string              `json:"tid,omitempty"`
+	Discourse string              `json:"discourse,omitempty"`
+	Restate   string              `json:"restate,omitempty"`
+	Subj      string              `json:"subj,omitempty"`
+	Body      map[string]string   `json:"body,omitempty"`
+	Quest     map[string]string   `json:"quest,omitempty"`
+	Resources []Resource          `json:"resources,omitempty"`
+	Menu      []MenuOption        `json:"menu,omitempty"`
 }
+
+var (
+	MaxResources     = 7
+	DBCacheFilename    = "/etc/aide/dbcache.json"
+	MsgCacheFilename    = "/etc/aide/msgcache.json"
+)
 
 func New(conf string, KnowDBAddress string,  LingProcAddress string, concurrencyFactor int) (*Shard, error) {
 	var shard *C.struct_kndShard = nil
@@ -65,6 +122,16 @@ func New(conf string, KnowDBAddress string,  LingProcAddress string, concurrency
 		}
 		s.workers <- task
 	}
+
+	err := s.PopulateScriptCache(DBCacheFilename)
+	if err != nil {
+		return nil, errors.New("failed to read json script db cache")
+	}
+	err = s.PopulateMsgCache(MsgCacheFilename)
+	if err != nil {
+		return nil, errors.New("failed to read msg cache")
+	}
+	
 	return &s, nil
 }
 
@@ -84,6 +151,75 @@ func taskTypeToStr(v C.int) string {
 	default:
 		return "unknown"
 	}
+}
+
+func (s *Shard) PopulateScriptCache(Filename string) (error) {
+	CacheBytes, err := ioutil.ReadFile(Filename)
+	if err != nil {
+		log.Println("JSON DB: ", err.Error())
+		return errors.New("failed to read json db cache")
+	}
+	log.Println("JSON DB: ", string(CacheBytes))
+	err = json.Unmarshal(CacheBytes, &s.Scripts)
+	if err != nil {
+		log.Println("Unmarshal: ", err.Error())
+		return errors.New("failed to read json script db cache")
+	}
+	
+	script := s.Scripts["sc-explore"]
+	phase := script.ScriptPhases["init"]
+	b, _ := json.Marshal(phase)
+	log.Println("init script phase: ", string(b))
+	return nil
+}
+
+func (s *Shard) PopulateMsgCache(Filename string) (error) {
+	CacheBytes, err := ioutil.ReadFile(Filename)
+	if err != nil {
+		log.Println("JSON Msg DB: ", err.Error())
+		return errors.New("failed to read json msg cache")
+	}
+	log.Println("Msg DB: ", string(CacheBytes))
+	err = json.Unmarshal(CacheBytes, &s.LangCaches)
+	if err != nil {
+		log.Println("Unmarshal: ", err.Error())
+		return errors.New("failed to parse json msg cache")
+	}
+
+	s.MsgIdx = make(map[string][]MsgInterp)
+
+	for _, lc := range s.LangCaches {
+		for _, ctx := range lc.ScriptCtxs {
+			for _, react := range ctx.ScriptReacts {
+				for _, trig := range react.Triggers {
+					s.RegisterMsg(trig, react, ctx)
+				}}}}
+
+	for key, interps := range s.MsgIdx {
+		log.Println("Msg: ", key, " val:", interps)
+		if key == strings.ToUpper("Where do I start") {
+			for _, interp := range interps {
+				log.Println("Ctx: ", interp.ScriptCtx.Id, " React:", interp.ScriptReact.Id)
+				
+			}
+		}
+	}
+
+	reply, _ := s.CacheLookup("123", "init", "Where do I start", "en")
+	log.Println("Reply: ", reply)
+	
+	return nil
+}
+
+func (s *Shard) RegisterMsg(msg string, react ScriptReact, ctx ScriptCtx) (error) {
+	uc_msg := strings.ToUpper(msg)
+	interps, is_present := s.MsgIdx[uc_msg]
+	if !is_present {
+		interps = make([]MsgInterp, 0)
+	}
+	interp := MsgInterp{&ctx, &react}
+	s.MsgIdx[uc_msg] = append(interps, interp)
+	return nil
 }
 
 func (s *Shard) RunTask(task string, TaskLen int) (string, string, error) {
@@ -128,15 +264,50 @@ func (s *Shard) SendMasterTask(GSL string) (string, error) {
 	return string(body), nil
 }
 
+func buildMsgReply(sid string, ctx string, phase ScriptPhase, lang string) (string, error) {
+	//var body strings.Builder
+	// body.WriteString("--")
+	// body.String()
+
+	reply := Message{sid, ctx, "stm", "Reply", "-- restate --",
+		phase.Body, phase.Quest, phase.Resources, phase.Menu}
+	
+	b, _ := json.Marshal(reply)
+	return string(b), nil
+}
+
+func (s *Shard) CacheLookup(sid string, ctx string, msg string, lang string) (string, error) {
+	k := strings.ToUpper(msg)
+	k = strings.TrimSpace(k)
+
+	interps, is_present := s.MsgIdx[k]
+	if !is_present {
+		return "", errors.New("key not present in cache")
+	}
+
+	for _, interp := range interps {
+		if ctx != interp.ScriptCtx.Id { continue }
+
+		log.Println("Ctx: ", interp.ScriptCtx.Id, " React:", interp.ScriptReact.Id)
+
+		script, is_present := s.Scripts[interp.ScriptReact.Id]
+		if !is_present {
+			return "", errors.New("script not found")
+		}
+		return buildMsgReply(sid, script.Id, script.ScriptPhases["init"], lang)
+	}
+	return "", errors.New("no valid interp found")
+}
 
 func (s *Shard) ProcessMsg(sid string, tid string, msg string, lang string) (string, string, error) {
-	graph, err := s.DecodeText(msg, lang)
-	if err != nil {
-		return "", "", errors.New("text decoding failed :: " + err.Error())
+	reply, err := s.CacheLookup(sid, tid, msg, lang)
+	if err == nil {
+		return reply, "msg", nil
         }
 
-	if graph == "{}" {
-		return "", "", errors.New("empty graph :: " + err.Error())
+	_, err = s.DecodeText(msg, lang)
+	if err != nil {
+		return "", "", errors.New("text decoding failed :: " + err.Error())
         }
 
         // parse GSL, build msg tree
@@ -156,7 +327,7 @@ func (s *Shard) ProcessMsg(sid string, tid string, msg string, lang string) (str
 	// 	return "", "", errors.New("text encoding failed :: " + err.Error())
 	//}
 
-	reply := Message{sid, tid, "stm", "-- restate --", "-- reply --", []string{"a","b","c"}, []string{"one","two","three"}}
-	b, err := json.Marshal(reply)
+	m := Message{sid, tid, "stm", "Subj", "-- restate --", nil, nil, nil, nil}
+	b, err := json.Marshal(m)
 	return string(b), "msg", nil
 }
