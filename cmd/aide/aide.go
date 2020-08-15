@@ -14,30 +14,27 @@ import (
 	"os/signal"
 	"runtime"
 	"time"
-
 	"github.com/dgrijalva/jwt-go"
 	"github.com/dgrijalva/jwt-go/request"
 	"github.com/gorilla/schema"
-
 	"github.com/globbie/aide/pkg/knowdy"
+	"github.com/globbie/aide/pkg/mail"
+	"github.com/globbie/aide/pkg/session"
 )
 
 type Config struct {
 	ListenAddress     string        `json:"listen-address"`
-	KnowDBAddress     string        `json:"know-db-address"`
-	LingProcAddress   string        `json:"ling-proc-address"`
+	KnowdyAddress     string        `json:"knowdy-address"`
+	KnowdyServiceName string        `json:"knowdy-service-name"`
+	KnowdyShards      []string      `json:"knowdy-shards"`
+	LingProcAddress   string        `json:"ling-service-name"`
 	KndConfigPath     string        `json:"shard-config"`
+	MailServerAddress string        `json:"mail-server-address"`
+	MailServerUser    string        `json:"mail-server-user"`
+	MailServerAuth    string        `json:"mail-server-auth"`
 	RequestsMax       int           `json:"requests-max"`
 	SlotAwaitDuration time.Duration `json:"slot-await-duration"`
-
-	VerifyKeyPath string `json:"verify-key-path"`
-}
-
-type Msg struct {
-	Content   string `schema:"t,required"`
-	Lang      string `schema:"lang,required"`
-	SessionId string `schema:"sid,required"`
-	Tid       string `schema:"tid"`
+	VerifyKeyPath     string        `json:"verify-key-path"`
 }
 
 var (
@@ -53,6 +50,7 @@ func init() {
 		kndConfigPath string
 		verifyKeyPath string
 		listenAddress string
+		lingAddress   string
 		requestsMax   int
 		duration      time.Duration
 	)
@@ -60,6 +58,7 @@ func init() {
 	flag.StringVar(&configPath, "config-path", "/etc/aide/aide.json", "path to AIDE config")
 	flag.StringVar(&kndConfigPath, "knd-config-path", "/etc/aide/shard.gsl", "path to Knowdy config")
 	flag.StringVar(&listenAddress, "listen-address", "", "AIDE listen address")
+	flag.StringVar(&lingAddress, "ling-address", "", "Glottie ling proc address")
 	flag.IntVar(&requestsMax, "requests-limit", 10, "maximum number of requests to process simultaneously")
 	flag.DurationVar(&duration, "request-limit-duration", 1*time.Second, "free slot awaiting time")
 	flag.Parse()
@@ -81,6 +80,9 @@ func init() {
 		}
 		if listenAddress != "" {
 			cfg.ListenAddress = listenAddress
+		}
+		if lingAddress != "" {
+			cfg.LingProcAddress = lingAddress
 		}
 		if verifyKeyPath != "" {
 			cfg.VerifyKeyPath = verifyKeyPath
@@ -115,13 +117,21 @@ func init() {
 }
 
 func main() {
-	shard, err := knowdy.New(KndConfig, cfg.KnowDBAddress, cfg.LingProcAddress, runtime.GOMAXPROCS(0))
+	shard, err := knowdy.New(KndConfig, cfg.KnowdyAddress, cfg.KnowdyServiceName, cfg.LingProcAddress,
+		cfg.KnowdyShards, runtime.GOMAXPROCS(0))
 	if err != nil {
-		log.Fatalln("could not create a Shard, error:", err)
+		log.Fatalln("could not create a Knowdy Shard, error:", err)
 	}
 	defer shard.Del()
 
+	ms, e := mail.New(cfg.MailServerAddress, cfg.MailServerUser, cfg.MailServerAuth)
+	if e != nil {
+		log.Fatalln("failed to create mail service, error:", e)
+	}
+
 	router := http.NewServeMux()
+	router.Handle("/session", measurer(limiter(sessionHandler(shard),
+		cfg.RequestsMax, cfg.SlotAwaitDuration)))
 	router.Handle("/gsl", measurer(limiter(gslHandler(shard),
 		cfg.RequestsMax, cfg.SlotAwaitDuration)))
 	router.Handle("/msg", measurer(limiter(msgHandler(shard), cfg.RequestsMax, cfg.SlotAwaitDuration)))
@@ -154,7 +164,15 @@ func main() {
 	}()
 
 	hostname, _ := os.Hostname()
-	log.Println("AIDE server is ready to handle requests at ", hostname, " ", cfg.ListenAddress)
+	currentTime := time.Now()
+
+	log.Println("AIDE server is ready to handle requests at ", hostname, " ",
+		cfg.ListenAddress, " Glottie service:", cfg.LingProcAddress,
+		" shards:", cfg.KnowdyShards)
+
+	var msg = "AIDE server started at " + currentTime.String()
+	log.Println(msg, ms)
+	//go ms.SendMail(from, to, msg)
 
 	err = server.ListenAndServe()
 	if err != nil && err != http.ErrServerClosed {
@@ -196,8 +214,8 @@ func authorization(h http.Handler) http.Handler {
 			http.Error(w, "unauthorized", http.StatusUnauthorized)
 			return
 		}
-		//claims := token.Claims.(jwt.MapClaims)
-		// log.Printf("Token for user %s expires %v", claims["email"], claims["exp"])
+		claims := token.Claims.(jwt.MapClaims)
+		log.Printf("Token for user %s expires %v", claims["email"], claims["exp"])
 		ctx := context.WithValue(r.Context(), "token", token)
 		h.ServeHTTP(w, r.WithContext(ctx))
 	})
@@ -238,20 +256,18 @@ func msgHandler(shard *knowdy.Shard) http.Handler {
 			return
 		}
 		if err := r.ParseForm(); err != nil {
-			http.Error(w, "URL format error: "+err.Error(), http.StatusBadRequest)
+			http.Error(w, "URL format error: " + err.Error(), http.StatusBadRequest)
 			return
 		}
 
-		msg := new(Msg)
+		msg := new(knowdy.Message)
 		if err := schema.NewDecoder().Decode(msg, r.Form); err != nil {
-			http.Error(w, "URL error: "+err.Error(), http.StatusBadRequest)
+			http.Error(w, "URL error: " + err.Error(), http.StatusBadRequest)
 			return
 		}
-
-		// r.Context().Value("token").(*jwt.Token)
-		result, _, err := shard.ProcessMsg(msg.SessionId, msg.Tid, msg.Content, msg.Lang)
+		result, _, err := shard.ProcessMsg(*msg)
 		if err != nil {
-			http.Error(w, "internal server error: "+err.Error(), http.StatusInternalServerError)
+			http.Error(w, "internal server error: " + err.Error(), http.StatusInternalServerError)
 			return
 		}
 
@@ -265,5 +281,35 @@ func msgHandler(shard *knowdy.Shard) http.Handler {
 		//	metrics.Success = true
 		//	metrics.TaskType = taskType
 		//}
+	})
+}
+
+func sessionHandler(shard *knowdy.Shard) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodGet {
+			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+			return
+		}
+		_, err := r.Cookie("SID")
+		if err == nil {
+			w.Header().Set("Content-Type", "application/json")
+			_, _ = io.WriteString(w, "{\"status\"\"SID is already set\":}")
+			return
+		}
+
+		ses, _ := session.New(r)
+		result, cookies, err := shard.CreateChatSession(ses)
+		if err != nil {
+			http.Error(w, "failed to open a session: " + err.Error(), http.StatusInternalServerError)
+			return
+		}
+
+		for _, cookie := range cookies {
+			http.SetCookie(w, &cookie)
+			log.Println("++ set cookie:", cookie.Name)
+		}
+		
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = io.WriteString(w, result)
 	})
 }

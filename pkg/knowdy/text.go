@@ -9,7 +9,7 @@ import (
 	"time"
 )
 
-func (s *Shard) DecodeText(text string, lang string) (string, error) {
+func (s *Shard) DecodeText(text string, lang string) (string, string, error) {
 	u := url.URL{Scheme: "http", Host: s.LingProcAddress, Path: "/text-to-graph"}
 	parameters := url.Values{}
 	parameters.Add("t", text)
@@ -23,13 +23,17 @@ func (s *Shard) DecodeText(text string, lang string) (string, error) {
 	resp, err := netClient.Get(u.String())
 	if err != nil {
 		log.Println(err.Error())
-		return "", err
+		return "", "", err
 	}
 	defer resp.Body.Close()
-
 	body, _ := ioutil.ReadAll(resp.Body)
 
-	return string(body), nil
+	dt := resp.Header.Get("GLT-Discourse-Type")
+	if dt != "" {
+		log.Println("discourse type: ", dt)
+	}
+
+	return string(body), dt, nil
 }
 
 func (s *Shard) EncodeText(graph string, lang string) (string, error) {
