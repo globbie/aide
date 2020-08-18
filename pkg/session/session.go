@@ -1,11 +1,14 @@
 package session
 
 import (
-	"fmt"
+	"errors"
+	"crypto/rsa"
 	"net"
 	"net/http"
 	"strings"
+	"time"
 
+	"github.com/dgrijalva/jwt-go"
 	"golang.org/x/text/language"
 )
 
@@ -19,14 +22,22 @@ type ChatSession struct {
 	UserAgent   string
 	UserIP      string
 	Langs       []language.Tag
+	Roles       []string
 	Threads     []ChatThread
+}
+
+type Claims struct {
+	*jwt.StandardClaims
+	UserID    string   `json:"userid,required"`
+	ShardID   string   `json:"shardid,required"`
+	UserRoles []string `json:"roles,omitempty"`
 }
 
 func New(r *http.Request) (*ChatSession, error) {
 	cs := ChatSession{
 		UserAgent: r.UserAgent(),
 	}
-	ip, err := getSessionIP(r)
+	ip, err := GetSessionIP(r)
 	if err == nil {
 		cs.UserIP = ip
 	}
@@ -35,18 +46,20 @@ func New(r *http.Request) (*ChatSession, error) {
 	return &cs, nil
 }
 
-func buildSessionCookie(name string, val string, domain string) (*http.Cookie, error) {
+func BuildSessionCookie(name string, val string, domain string) (*http.Cookie, error) {
 	cookie := http.Cookie{}
 	cookie.Name = name
 	cookie.Value = val
 	cookie.Path = "/"
-	cookie.Domain = domain
+	if domain != "localhost" {
+		cookie.Domain = domain
+	}
 	cookie.Expires = time.Now().Add(356 * 24 * time.Hour)
 	cookie.HttpOnly = true
 	return &cookie, nil
 }
 
-func getSessionIP(r *http.Request) (string, error) {
+func GetSessionIP(r *http.Request) (string, error) {
     ip := r.Header.Get("X-REAL-IP")
     netIP := net.ParseIP(ip)
     if netIP != nil {
@@ -68,5 +81,18 @@ func getSessionIP(r *http.Request) (string, error) {
     if netIP != nil {
         return ip, nil
     }
-    return "", fmt.Errorf("No valid IP found")
+    return "", errors.New("No valid IP found")
+}
+
+func IssueAccessToken(ses *ChatSession, signKey *rsa.PrivateKey, expiry int) (string, error) {
+	token := jwt.New(jwt.GetSigningMethod("RS256"))
+	token.Claims = &Claims{
+		StandardClaims: &jwt.StandardClaims{
+			ExpiresAt: time.Now().Add(time.Hour * time.Duration(expiry)).Unix(),
+		},
+		ShardID: ses.ShardID,
+		UserID: ses.UserID,
+		UserRoles: ses.Roles,
+	}
+	return token.SignedString(signKey)
 }

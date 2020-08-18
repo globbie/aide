@@ -16,6 +16,7 @@ import "C"
 
 import (
 	"bytes"
+	"crypto/rsa"
 	"encoding/json"
 	"errors"
 	"io/ioutil"
@@ -90,6 +91,7 @@ type ShardInfo struct {
 type Shard struct {
 	shard               *C.struct_kndShard
 	Name                string
+	ServiceDomain       string
 	KnowdyAddress       string
 	KnowdyServiceName   string
 	LingProcAddress     string
@@ -109,8 +111,7 @@ type Resource struct {
 }
 
 type Message struct {
-	Sid       string              `schema:"sid,required" json:"sid,omitempty"`
-	Tid       string              `json:"tid,omitempty"`
+	ChatSession  *session.ChatSession     `json:"chatsession,omitempty"`
 	Ctx       string              `json:"ctx,omitempty"`
 	Discourse string              `json:"discourse,omitempty"`
 	Lang      string              `schema:"lang" json:"lang,omitempty"`
@@ -130,7 +131,7 @@ var (
 	MsgCacheFilename    = "/etc/aide/msgcache.json"
 )
 
-func New(conf string, KnowdyAddress string,  KnowdyServiceName string, LingProcAddress string, PeerShards []string, concurrencyFactor int) (*Shard, error) {
+func New(conf string, KnowdyAddress string,  KnowdyServiceName string, LingProcAddress string, ServiceDomain string, PeerShards []string, concurrencyFactor int) (*Shard, error) {
 	var shard *C.struct_kndShard = nil
 	errCode := C.knd_shard_new((**C.struct_kndShard)(&shard), C.CString(conf), C.size_t(len(conf)))
 	if errCode != C.int(0) {
@@ -139,6 +140,7 @@ func New(conf string, KnowdyAddress string,  KnowdyServiceName string, LingProcA
 
 	s := Shard{
 		shard:         shard,
+		ServiceDomain: ServiceDomain,
 		KnowdyAddress: KnowdyAddress,
 		KnowdyServiceName: KnowdyServiceName,
 		LingProcAddress: LingProcAddress,
@@ -304,12 +306,13 @@ func (s *Shard) ApplyCommit(Address string, GSL string) (string, error) {
 	return string(body), nil
 }
 
-func buildMsgReply(sid string, tid string, ctx string, phase ScriptPhase, lang string) (string, error) {
+func buildMsgReply(ses *session.ChatSession, tid string, ctx string, phase ScriptPhase, lang string) (string, error) {
 	//var body strings.Builder
 	// body.WriteString("--")
 	// body.String()
-
-	reply := Message{sid, tid, ctx, "stm", lang,
+	log.Println(ses)
+	
+	reply := Message{nil, ctx, "stm", lang,
 		map[string]string{"en":"Reply"}, "", phase.Body, map[string]string{"en":"-- restate --"},
 		phase.Resources, phase.GeoTags, phase.Quest, phase.Menu}
 
@@ -317,7 +320,7 @@ func buildMsgReply(sid string, tid string, ctx string, phase ScriptPhase, lang s
 	return string(b), nil
 }
 
-func (s *Shard) CacheLookup(sid string, ctx string, msg string, lang string) (string, error) {
+func (s *Shard) CacheLookup(ses *session.ChatSession, ctx string, msg string, lang string) (string, error) {
 	k := strings.ToUpper(msg)
 	k = strings.TrimSpace(k)
 
@@ -335,16 +338,18 @@ func (s *Shard) CacheLookup(sid string, ctx string, msg string, lang string) (st
 		if !is_present {
 			return "", errors.New("script not found")
 		}
-		return buildMsgReply(sid, script.Id, interp.ScriptReact.Id, script.ScriptPhases["init"], lang)
+		return buildMsgReply(ses, script.Id, interp.ScriptReact.Id, script.ScriptPhases["init"], lang)
 	}
 	return "", errors.New("no valid interp found")
 }
 
-func (s *Shard) ProcessMsg(msg Message) (string, string, error) {
+func (s *Shard) ProcessMsg(msg *Message) (string, string, error) {
+	log.Println("..process msg from ", msg.ChatSession)
+	
 	if msg.Lang == "" {
 		msg.Lang = "en" // set default lang
 	}
-	reply, err := s.CacheLookup(msg.Sid, msg.Ctx, msg.Input, msg.Lang)
+	reply, err := s.CacheLookup(msg.ChatSession, msg.Ctx, msg.Input, msg.Lang)
 	if err == nil {
 		return reply, "msg", nil
         }
@@ -387,22 +392,23 @@ func (s *Shard) ProcessMsg(msg Message) (string, string, error) {
 	return string(b), "msg", nil
 }
 
-func (s *Shard) CommitStatement(msg Message) (string, string, error) {
-	log.Println(".. SID ", msg.Sid, " stm commit in progress: ", msg.Restate[msg.Lang])
+func (s *Shard) CommitStatement(msg *Message) (string, string, error) {
+
+	log.Println(".. Session", msg.ChatSession, " stm commit in progress: ", msg.Restate[msg.Lang])
+
 	
 	b, _ := json.Marshal(msg)
 	return string(b), "msg", nil
 }
 
-func (s *Shard) RunQuery(msg Message) (string, string, error) {
-	log.Println(".. SID ", msg.Sid, " run query: ", msg.Restate[msg.Lang])
+func (s *Shard) RunQuery(msg *Message) (string, string, error) {
+	log.Println(".. Session ", msg.ChatSession, " run query: ", msg.Restate[msg.Lang])
 	
 	b, _ := json.Marshal(msg)
 	return string(b), "msg", nil
 }
 
-
-func (s *Shard) CreateChatSession(ses *session.ChatSession) (string, []http.Cookie, error) {
+func (s *Shard) CreateChatSession(ses *session.ChatSession, signKey *rsa.PrivateKey) (string, []*http.Cookie, error) {
 	var si *ShardInfo = nil
 	// select public shard to host a new session
 	// TODO: check current capacity
@@ -415,32 +421,54 @@ func (s *Shard) CreateChatSession(ses *session.ChatSession) (string, []http.Cook
 	if si == nil {
 		return "", nil, errors.New("failed to find a public peer shard")
 	}
-
 	ses.ShardID = si.Name
-	
-	var addr = s.KnowdyServiceName + "-" + si.Name
 
 	gsl := bytes.Buffer{}
 	gsl.WriteString("{task {class User {!inst _")
 	if ses.UserAgent != "" {
-		gsl.WriteString("[soft {" + ses.UserAgent +"}]")
+		gsl.WriteString("[soft{" + ses.UserAgent +"}]")
 	}
 	if ses.UserIP != "" {
-		gsl.WriteString("[ip-allow {" + ses.UserIP +"}]")
+		gsl.WriteString("[ip-allow{" + ses.UserIP +"}]")
 	}
 	gsl.WriteString("}}}")
 
+	var addr = s.KnowdyServiceName + "-" + si.Name
 	log.Println(".. create initial user session in shard ", addr)
 
 	// register new user
-	report, err := s.ApplyCommit(s.KnowdyAddress, gsl.String())
-	if err != nil {
-		return "", nil, errors.New("failed to register a user")
-	}
+	{
+		report, err := s.ApplyCommit(s.KnowdyAddress, gsl.String())
+		if err != nil {
+			return "", nil, errors.New("failed to register a user")
+		}
+		// TMP
+		pref := "{class User{!inst "
+		pref_size := len(pref)
+		i := strings.Index(report, pref)
+		remainder := report[i + pref_size:]
 
-	log.Println(report)
-	
-	// build initial greetings, menu options etc.
-	reply := "{\"msg\":\"Welcome!\"}"
-	return reply, nil, nil
+		idbuf := bytes.Buffer{}
+		for _, c := range remainder {
+			if c == '{' || c == '[' || c == ' '{
+				break
+			}
+			idbuf.WriteByte(byte(c))
+		}
+		ses.UserID = idbuf.String()
+		log.Println("== new UserID: ", ses.UserID)
+	}
+	// build access token
+	token, err := session.IssueAccessToken(ses, signKey, 8)
+	if err != nil {
+		return "", nil, errors.New("failed to issue SID token")
+	}
+	var cookie *http.Cookie
+	var cookies []*http.Cookie
+	cookie, err = session.BuildSessionCookie("SID", token, s.ServiceDomain)
+	cookies = append(cookies, cookie)
+
+	// TODO: build initial greetings, menu options etc.
+	reply := "{\"SID\":\"" + token + "\"}"
+	return reply, cookies, nil
 }

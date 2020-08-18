@@ -24,6 +24,7 @@ import (
 
 type Config struct {
 	ListenAddress     string        `json:"listen-address"`
+	ServiceDomain     string        `json:"service-domain"`
 	KnowdyAddress     string        `json:"knowdy-address"`
 	KnowdyServiceName string        `json:"knowdy-service-name"`
 	KnowdyShards      []string      `json:"knowdy-shards"`
@@ -34,6 +35,7 @@ type Config struct {
 	MailServerAuth    string        `json:"mail-server-auth"`
 	RequestsMax       int           `json:"requests-max"`
 	SlotAwaitDuration time.Duration `json:"slot-await-duration"`
+	SignKeyPath       string        `json:"sign-key-path"`
 	VerifyKeyPath     string        `json:"verify-key-path"`
 }
 
@@ -41,6 +43,7 @@ var (
 	cfg       *Config
 	KndConfig string
 	VerifyKey *rsa.PublicKey
+	SignKey   *rsa.PrivateKey
 )
 
 // todo(n.rodionov): write a separate function for each {} excess block
@@ -48,7 +51,6 @@ func init() {
 	var (
 		configPath    string
 		kndConfigPath string
-		verifyKeyPath string
 		listenAddress string
 		lingAddress   string
 		requestsMax   int
@@ -84,9 +86,6 @@ func init() {
 		if lingAddress != "" {
 			cfg.LingProcAddress = lingAddress
 		}
-		if verifyKeyPath != "" {
-			cfg.VerifyKeyPath = verifyKeyPath
-		}
 	}
 
 	{ // load shard config
@@ -97,6 +96,16 @@ func init() {
 		KndConfig = string(shardConfigBytes)
 	}
 
+	{ // load sign key
+		signKeyBytes, err := ioutil.ReadFile(cfg.SignKeyPath)
+		if err != nil {
+			log.Fatalln("failed to read sign key:", err)
+		}
+		SignKey, err = jwt.ParseRSAPrivateKeyFromPEM(signKeyBytes)
+		if err != nil {
+			log.Fatalln("failed to parse sign key:", err)
+		}
+	}
 	{ // load verify key
 		verifyBytes, err := ioutil.ReadFile(cfg.VerifyKeyPath)
 		if err != nil {
@@ -104,7 +113,7 @@ func init() {
 		}
 		VerifyKey, err = jwt.ParseRSAPublicKeyFromPEM(verifyBytes)
 		if err != nil {
-			log.Fatalln(err)
+			log.Fatalln("failed to parse verify key:", err)
 		}
 	}
 
@@ -118,7 +127,7 @@ func init() {
 
 func main() {
 	shard, err := knowdy.New(KndConfig, cfg.KnowdyAddress, cfg.KnowdyServiceName, cfg.LingProcAddress,
-		cfg.KnowdyShards, runtime.GOMAXPROCS(0))
+		cfg.ServiceDomain, cfg.KnowdyShards, runtime.GOMAXPROCS(0))
 	if err != nil {
 		log.Fatalln("could not create a Knowdy Shard, error:", err)
 	}
@@ -134,7 +143,7 @@ func main() {
 		cfg.RequestsMax, cfg.SlotAwaitDuration)))
 	router.Handle("/gsl", measurer(limiter(gslHandler(shard),
 		cfg.RequestsMax, cfg.SlotAwaitDuration)))
-	router.Handle("/msg", measurer(limiter(msgHandler(shard), cfg.RequestsMax, cfg.SlotAwaitDuration)))
+	router.Handle("/msg", authorization(measurer(limiter(msgHandler(shard), cfg.RequestsMax, cfg.SlotAwaitDuration))))
 	router.Handle("/metrics", metricsHandler)
 
 	server := &http.Server{
@@ -215,8 +224,16 @@ func authorization(h http.Handler) http.Handler {
 			return
 		}
 		claims := token.Claims.(jwt.MapClaims)
-		log.Printf("Token for user %s expires %v", claims["email"], claims["exp"])
-		ctx := context.WithValue(r.Context(), "token", token)
+		ses, _ := session.New(r)
+
+		log.Printf("== UserID: %s, ShardID: %s  Token expires: %s",
+			claims["userid"], claims["shardid"],
+			time.Unix(int64(claims["exp"].(float64)),0))
+
+		ses.UserID = claims["userid"].(string)
+		ses.ShardID = claims["shardid"].(string)
+		
+		ctx := context.WithValue(r.Context(), "session", ses)
 		h.ServeHTTP(w, r.WithContext(ctx))
 	})
 }
@@ -241,7 +258,6 @@ func gslHandler(shard *knowdy.Shard) http.Handler {
 		// TODO output formats
 		w.Header().Set("Content-Type", "application/json")
 		fmt.Fprint(w, result)
-
 		if metrics, ok := r.Context().Value(metricsKey).(*Metrics); ok {
 			metrics.Success = true
 			metrics.TaskType = taskType
@@ -265,7 +281,11 @@ func msgHandler(shard *knowdy.Shard) http.Handler {
 			http.Error(w, "URL error: " + err.Error(), http.StatusBadRequest)
 			return
 		}
-		result, _, err := shard.ProcessMsg(*msg)
+		if ses, ok := r.Context().Value("session").(*session.ChatSession); ok {
+			msg.ChatSession = ses
+		}
+
+		result, _, err := shard.ProcessMsg(msg)
 		if err != nil {
 			http.Error(w, "internal server error: " + err.Error(), http.StatusInternalServerError)
 			return
@@ -290,23 +310,36 @@ func sessionHandler(shard *knowdy.Shard) http.Handler {
 			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
 			return
 		}
-		_, err := r.Cookie("SID")
-		if err == nil {
-			w.Header().Set("Content-Type", "application/json")
-			_, _ = io.WriteString(w, "{\"status\"\"SID is already set\":}")
-			return
+		{  // check SID cookie
+			cookie, err := r.Cookie("SID")
+			if err == nil {
+				claims := jwt.MapClaims{}
+				_, e := jwt.ParseWithClaims(cookie.Value, &claims, func(token *jwt.Token) (interface{}, error) {
+					return VerifyKey, nil
+				})
+				if e != nil {
+					http.Error(w, "invalid SID", http.StatusBadRequest)
+					return
+				}
+				for key, val := range claims {
+					fmt.Printf("Key: %v, value: %v\n", key, val)
+				}
+				w.Header().Set("Content-Type", "application/json")
+				_, _ = io.WriteString(w, "{\"status\":\"valid SID cookie already set\"}")
+				return
+			}
 		}
 
 		ses, _ := session.New(r)
-		result, cookies, err := shard.CreateChatSession(ses)
+		result, cookies, err := shard.CreateChatSession(ses, SignKey)
 		if err != nil {
 			http.Error(w, "failed to open a session: " + err.Error(), http.StatusInternalServerError)
 			return
 		}
 
 		for _, cookie := range cookies {
-			http.SetCookie(w, &cookie)
-			log.Println("++ set cookie:", cookie.Name)
+			http.SetCookie(w, cookie)
+			// log.Println("++ set cookie:", cookie.Name, cookie.Value)
 		}
 		
 		w.Header().Set("Content-Type", "application/json")
