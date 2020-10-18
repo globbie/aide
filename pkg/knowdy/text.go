@@ -10,7 +10,7 @@ import (
 )
 
 func (s *Shard) DecodeText(text string, lang string) (string, string, error) {
-	u := url.URL{Scheme: "http", Host: s.LingProcAddress, Path: "/text-to-graph"}
+	u := url.URL{Scheme: "http", Host: s.LingProcAddress, Path: "/decode"}
 	parameters := url.Values{}
 	parameters.Add("t", text)
 	parameters.Add("lang", lang)
@@ -29,15 +29,14 @@ func (s *Shard) DecodeText(text string, lang string) (string, string, error) {
 	body, _ := ioutil.ReadAll(resp.Body)
 
 	dt := resp.Header.Get("GLT-Discourse-Type")
-	if dt != "" {
-		log.Println("discourse type: ", dt)
-	}
-
+	// if dt != "" {
+	//	log.Println("discourse type: ", dt)
+	// }
 	return string(body), dt, nil
 }
 
 func (s *Shard) EncodeText(graph string, lang string) (string, error) {
-	u := url.URL{Scheme: "http", Host: s.LingProcAddress, Path: "/graph-to-text"}
+	u := url.URL{Scheme: "http", Host: s.LingProcAddress, Path: "/encode"}
 	parameters := url.Values{}
 	parameters.Add("cs", lang)
 	u.RawQuery = parameters.Encode()
@@ -53,6 +52,18 @@ func (s *Shard) EncodeText(graph string, lang string) (string, error) {
 	defer resp.Body.Close()
 
 	body, _ := ioutil.ReadAll(resp.Body)
-
 	return string(body), nil
 }
+
+/*
+pass phrase generation
+
+Please note that it's an auto-generated list of randomized phrases.
+
+As such
+any  offensive or otherwise inappropriate phrase
+  please mark it so that we exclude it from further suggestions to anybody
+Thank you for understanding and cooperation.
+
+
+*/

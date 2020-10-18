@@ -13,12 +13,12 @@ import (
 )
 
 type ChatThread struct {
-	ThreadID     string
+	ThreadId     string
 }
 
 type ChatSession struct {
-	UserID      string
-	ShardID     string
+	UserId      string
+	ShardId     string
 	UserAgent   string
 	UserIP      string
 	Langs       []language.Tag
@@ -28,8 +28,8 @@ type ChatSession struct {
 
 type Claims struct {
 	*jwt.StandardClaims
-	UserID    string   `json:"userid,required"`
-	ShardID   string   `json:"shardid,required"`
+	UserId    string   `json:"uid,required"`
+	ShardId   string   `json:"shard,required"`
 	UserRoles []string `json:"roles,omitempty"`
 }
 
@@ -90,9 +90,13 @@ func IssueAccessToken(ses *ChatSession, signKey *rsa.PrivateKey, expiry int) (st
 		StandardClaims: &jwt.StandardClaims{
 			ExpiresAt: time.Now().Add(time.Hour * time.Duration(expiry)).Unix(),
 		},
-		ShardID: ses.ShardID,
-		UserID: ses.UserID,
+		ShardId:   ses.ShardId,
+		UserId:    ses.UserId,
 		UserRoles: ses.Roles,
 	}
 	return token.SignedString(signKey)
 }
+
+/*
+A link to activate your account has been emailed to the address provided.
+*/

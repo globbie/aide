@@ -31,8 +31,8 @@ import (
 )
 
 type KnowdyClaims struct {
-    UserID    string `json:"uid"`
-    ShardID   string `json:"shardid"`
+    UserId    string `json:"uid"`
+    ShardId   string `json:"shard"`
     jwt.StandardClaims
 }
 
@@ -197,19 +197,17 @@ func taskTypeToStr(v C.int) string {
 func (s *Shard) PopulateScriptCache(Filename string) (error) {
 	CacheBytes, err := ioutil.ReadFile(Filename)
 	if err != nil {
-		log.Println("JSON DB: ", err.Error())
+		// log.Println("JSON DB: ", err.Error())
 		return errors.New("failed to read json db cache")
 	}
-	log.Println("JSON DB: ", string(CacheBytes))
 	err = json.Unmarshal(CacheBytes, &s.Scripts)
 	if err != nil {
-		log.Println("Unmarshal: ", err.Error())
+		// log.Println("Unmarshal: ", err.Error())
 		return errors.New("failed to read json script db cache")
 	}
-	script := s.Scripts["explore"]
-	phase := script.ScriptPhases["init"]
-	b, _ := json.Marshal(phase)
-	log.Println("init script phase: ", string(b))
+	// script := s.Scripts["explore"]
+	// phase := script.ScriptPhases["init"]
+	// b, _ := json.Marshal(phase)
 	return nil
 }
 
@@ -293,8 +291,6 @@ func (s *Shard) ApplyCommit(Address string, GSL string) (string, error) {
 	var netClient = &http.Client{
 		Timeout: time.Second * 7,
 	}
-	log.Println(".. calling service ", u)
-
 	resp, err := netClient.Post(u.String(), "text/plain; charset=utf-8", bytes.NewBuffer([]byte(GSL)))
 	if err != nil {
 		log.Println("-- network failure: ", err.Error())
@@ -303,6 +299,9 @@ func (s *Shard) ApplyCommit(Address string, GSL string) (string, error) {
 	defer resp.Body.Close()
 
 	body, _ := ioutil.ReadAll(resp.Body)
+	if (resp.StatusCode != 200) {
+		return string(body), errors.New("failed to apply a commit")
+	}
 	return string(body), nil
 }
 
@@ -343,20 +342,20 @@ func (s *Shard) CacheLookup(ses *session.ChatSession, ctx string, msg string, la
 	return "", errors.New("no valid interp found")
 }
 
-func (s *Shard) ProcessMsg(msg *Message) (string, string, error) {
-	log.Println("..process msg from ", msg.ChatSession)
-	
+func (s *Shard) ProcessMsg(msg *Message) (string, error) {
 	if msg.Lang == "" {
 		msg.Lang = "en" // set default lang
+		if len(msg.ChatSession.Langs) > 0 {
+			msg.Lang = msg.ChatSession.Langs[0].String()
+		}
 	}
 	reply, err := s.CacheLookup(msg.ChatSession, msg.Ctx, msg.Input, msg.Lang)
 	if err == nil {
-		return reply, "msg", nil
+		return reply, nil
         }
-
 	reply, msg.Discourse, err = s.DecodeText(msg.Input, msg.Lang)
 	if err != nil {
-		return "", "", errors.New("text decoding failed :: " + err.Error())
+		return "", errors.New("text decoding failed :: " + err.Error())
         }
 	msg.Body = make(map[string]string)
 	msg.Restate = make(map[string]string)
@@ -370,7 +369,8 @@ func (s *Shard) ProcessMsg(msg *Message) (string, string, error) {
 	case "query":
 		return s.RunQuery(msg)
 	case "theme":
-		return s.RunQuery(msg)
+		return s.CommitStatement(msg)
+		// return s.RunQuery(msg)
 	default:
 		break
 	}
@@ -389,23 +389,32 @@ func (s *Shard) ProcessMsg(msg *Message) (string, string, error) {
 	//}
 
 	b, err := json.Marshal(msg)
-	return string(b), "msg", nil
+	return string(b), nil
 }
 
-func (s *Shard) CommitStatement(msg *Message) (string, string, error) {
+func (s *Shard) CommitStatement(msg *Message) (string, error) {
+	var gsl strings.Builder
+	gsl.WriteString("{task{user " + msg.ChatSession.UserId)
+	gsl.WriteString("{repo ~{class Message{!inst _{body{_t")
+	gsl.WriteString(msg.Body[msg.Lang])
+	gsl.WriteString("}}}}}}}")
 
-	log.Println(".. Session", msg.ChatSession, " stm commit in progress: ", msg.Restate[msg.Lang])
+	log.Println(">> stm commit in progress: ", gsl.String())
+	report, err := s.ApplyCommit(s.KnowdyAddress, gsl.String())
+	if err != nil {
+		return "", errors.New("failed to save a user message")
+	}
+	log.Println("== commit report:", report)
 
-	
 	b, _ := json.Marshal(msg)
-	return string(b), "msg", nil
+	return string(b), nil
 }
 
-func (s *Shard) RunQuery(msg *Message) (string, string, error) {
+func (s *Shard) RunQuery(msg *Message) (string, error) {
 	log.Println(".. Session ", msg.ChatSession, " run query: ", msg.Restate[msg.Lang])
 	
 	b, _ := json.Marshal(msg)
-	return string(b), "msg", nil
+	return string(b), nil
 }
 
 func (s *Shard) CreateChatSession(ses *session.ChatSession, signKey *rsa.PrivateKey) (string, []*http.Cookie, error) {
@@ -421,7 +430,8 @@ func (s *Shard) CreateChatSession(ses *session.ChatSession, signKey *rsa.Private
 	if si == nil {
 		return "", nil, errors.New("failed to find a public peer shard")
 	}
-	ses.ShardID = si.Name
+	ses.ShardId = si.Name
+	log.Println("== shard:", ses.ShardId)
 
 	gsl := bytes.Buffer{}
 	gsl.WriteString("{task {class User {!inst _")
@@ -431,23 +441,32 @@ func (s *Shard) CreateChatSession(ses *session.ChatSession, signKey *rsa.Private
 	if ses.UserIP != "" {
 		gsl.WriteString("[ip-allow{" + ses.UserIP +"}]")
 	}
+	if len(ses.Langs) > 0 {
+		gsl.WriteString("[lang")
+		for _, langtag := range ses.Langs {
+			gsl.WriteString("{" + langtag.String() +"}")
+		}
+		gsl.WriteString("]")
+	}
 	gsl.WriteString("}}}")
-
-	var addr = s.KnowdyServiceName + "-" + si.Name
-	log.Println(".. create initial user session in shard ", addr)
 
 	// register new user
 	{
+		// var addr = s.KnowdyServiceName + "-" + si.Name
 		report, err := s.ApplyCommit(s.KnowdyAddress, gsl.String())
 		if err != nil {
+			log.Println("failed to register a user:" + report)
 			return "", nil, errors.New("failed to register a user")
 		}
+		log.Println(report)
 		// TMP
 		pref := "{class User{!inst "
 		pref_size := len(pref)
 		i := strings.Index(report, pref)
+		if i == -1 {
+			return "", nil, errors.New("failed to extract uid: no user inst")
+		}
 		remainder := report[i + pref_size:]
-
 		idbuf := bytes.Buffer{}
 		for _, c := range remainder {
 			if c == '{' || c == '[' || c == ' '{
@@ -455,20 +474,23 @@ func (s *Shard) CreateChatSession(ses *session.ChatSession, signKey *rsa.Private
 			}
 			idbuf.WriteByte(byte(c))
 		}
-		ses.UserID = idbuf.String()
-		log.Println("== new UserID: ", ses.UserID)
+		if idbuf.Len() == 0 {
+			return "", nil, errors.New("failed to extract uid")
+		}
+		ses.UserId = idbuf.String()
+		log.Println("== uid:", ses.UserId)
 	}
 	// build access token
-	token, err := session.IssueAccessToken(ses, signKey, 8)
+	token, err := session.IssueAccessToken(ses, signKey, 64)
 	if err != nil {
 		return "", nil, errors.New("failed to issue SID token")
 	}
 	var cookie *http.Cookie
 	var cookies []*http.Cookie
-	cookie, err = session.BuildSessionCookie("SID", token, s.ServiceDomain)
+	cookie, err = session.BuildSessionCookie("sid", token, s.ServiceDomain)
 	cookies = append(cookies, cookie)
 
 	// TODO: build initial greetings, menu options etc.
-	reply := "{\"SID\":\"" + token + "\"}"
+	reply := "{\"sid\":\"" + token + "\",\"uid\":\"" + ses.UserId + "\"}"
 	return reply, cookies, nil
 }

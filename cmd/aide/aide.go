@@ -36,6 +36,7 @@ type Config struct {
 	RequestsMax       int           `json:"requests-max"`
 	SlotAwaitDuration time.Duration `json:"slot-await-duration"`
 	SignKeyPath       string        `json:"sign-key-path"`
+	StaticPath        string        `json:"static-path"`
 	VerifyKeyPath     string        `json:"verify-key-path"`
 }
 
@@ -54,14 +55,16 @@ func init() {
 		listenAddress string
 		lingAddress   string
 		requestsMax   int
+		staticPath    string
 		duration      time.Duration
 	)
 
-	flag.StringVar(&configPath, "config-path", "/etc/aide/aide.json", "path to AIDE config")
+	flag.StringVar(&configPath,    "config-path", "/etc/aide/aide.json", "path to AIDE config")
 	flag.StringVar(&kndConfigPath, "knd-config-path", "/etc/aide/shard.gsl", "path to Knowdy config")
 	flag.StringVar(&listenAddress, "listen-address", "", "AIDE listen address")
-	flag.StringVar(&lingAddress, "ling-address", "", "Glottie ling proc address")
-	flag.IntVar(&requestsMax, "requests-limit", 10, "maximum number of requests to process simultaneously")
+	flag.StringVar(&staticPath,    "static-path", "/usr/local/var/www", "path to static content")
+	flag.StringVar(&lingAddress,   "ling-address", "", "Glottie ling proc address")
+	flag.IntVar(&requestsMax,      "requests-limit", 10, "max number of requests to process simultaneously")
 	flag.DurationVar(&duration, "request-limit-duration", 1*time.Second, "free slot awaiting time")
 	flag.Parse()
 
@@ -79,6 +82,9 @@ func init() {
 	{ // redefine config with cmd-line parameters
 		if kndConfigPath != "" {
 			cfg.KndConfigPath = kndConfigPath
+		}
+		if staticPath != "" {
+			cfg.StaticPath = staticPath
 		}
 		if listenAddress != "" {
 			cfg.ListenAddress = listenAddress
@@ -139,6 +145,7 @@ func main() {
 	}
 
 	router := http.NewServeMux()
+	router.Handle("/", http.FileServer(http.Dir(cfg.StaticPath)))
 	router.Handle("/session", measurer(limiter(sessionHandler(shard),
 		cfg.RequestsMax, cfg.SlotAwaitDuration)))
 	router.Handle("/gsl", measurer(limiter(gslHandler(shard),
@@ -220,18 +227,19 @@ func authorization(h http.Handler) http.Handler {
 			return VerifyKey, nil
 		})
 		if err != nil {
-			http.Error(w, "unauthorized", http.StatusUnauthorized)
+			log.Println(err.Error());
+			http.Error(w, "unauthorized " + err.Error(), http.StatusUnauthorized)
 			return
 		}
 		claims := token.Claims.(jwt.MapClaims)
 		ses, _ := session.New(r)
 
-		log.Printf("== UserID: %s, ShardID: %s  Token expires: %s",
-			claims["userid"], claims["shardid"],
-			time.Unix(int64(claims["exp"].(float64)),0))
+		log.Printf("== UserId: %s, ShardId: %s Token expires: %s  Langs:%s",
+			claims["uid"], claims["shard"],
+			time.Unix(int64(claims["exp"].(float64)),0), ses.Langs)
 
-		ses.UserID = claims["userid"].(string)
-		ses.ShardID = claims["shardid"].(string)
+		ses.UserId = claims["uid"].(string)
+		ses.ShardId = claims["shard"].(string)
 		
 		ctx := context.WithValue(r.Context(), "session", ses)
 		h.ServeHTTP(w, r.WithContext(ctx))
@@ -271,11 +279,11 @@ func msgHandler(shard *knowdy.Shard) http.Handler {
 			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
 			return
 		}
+		w.Header().Set("Content-Type", "application/json")
 		if err := r.ParseForm(); err != nil {
-			http.Error(w, "URL format error: " + err.Error(), http.StatusBadRequest)
+			http.Error(w, "{\"error\":\"" + err.Error() + "\"}", http.StatusBadRequest)
 			return
 		}
-
 		msg := new(knowdy.Message)
 		if err := schema.NewDecoder().Decode(msg, r.Form); err != nil {
 			http.Error(w, "URL error: " + err.Error(), http.StatusBadRequest)
@@ -284,17 +292,11 @@ func msgHandler(shard *knowdy.Shard) http.Handler {
 		if ses, ok := r.Context().Value("session").(*session.ChatSession); ok {
 			msg.ChatSession = ses
 		}
-
-		result, _, err := shard.ProcessMsg(msg)
+		result, err := shard.ProcessMsg(msg)
 		if err != nil {
 			http.Error(w, "internal server error: " + err.Error(), http.StatusInternalServerError)
 			return
 		}
-
-		// allow connections from web apps
-		w.Header().Set("Access-Control-Allow-Origin", "*")
-		w.Header().Set("Access-Control-Allow-Headers", "Content-Type")
-		w.Header().Set("Content-Type", "application/json")
 		_, _ = io.WriteString(w, result)
 
 		//if metrics, ok := r.Context().Value(metricsKey).(*Metrics); ok {
@@ -310,9 +312,11 @@ func sessionHandler(shard *knowdy.Shard) http.Handler {
 			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
 			return
 		}
+		w.Header().Set("Content-Type", "application/json")
 		{  // check SID cookie
-			cookie, err := r.Cookie("SID")
+			cookie, err := r.Cookie("sid")
 			if err == nil {
+				log.Println(">> sid cookie already set: " + cookie.Value)				
 				claims := jwt.MapClaims{}
 				_, e := jwt.ParseWithClaims(cookie.Value, &claims, func(token *jwt.Token) (interface{}, error) {
 					return VerifyKey, nil
@@ -324,25 +328,19 @@ func sessionHandler(shard *knowdy.Shard) http.Handler {
 				for key, val := range claims {
 					fmt.Printf("Key: %v, value: %v\n", key, val)
 				}
-				w.Header().Set("Content-Type", "application/json")
-				_, _ = io.WriteString(w, "{\"status\":\"valid SID cookie already set\"}")
+				_, _ = io.WriteString(w, "{\"sid\":\"" + cookie.Value + "\"}")
 				return
 			}
 		}
-
 		ses, _ := session.New(r)
 		result, cookies, err := shard.CreateChatSession(ses, SignKey)
 		if err != nil {
 			http.Error(w, "failed to open a session: " + err.Error(), http.StatusInternalServerError)
 			return
 		}
-
 		for _, cookie := range cookies {
 			http.SetCookie(w, cookie)
-			// log.Println("++ set cookie:", cookie.Name, cookie.Value)
 		}
-		
-		w.Header().Set("Content-Type", "application/json")
 		_, _ = io.WriteString(w, result)
 	})
 }
