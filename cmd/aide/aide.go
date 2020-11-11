@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"context"
 	"crypto/rsa"
 	"encoding/json"
@@ -12,11 +13,15 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"path/filepath"
 	"runtime"
 	"time"
+
 	"github.com/dgrijalva/jwt-go"
 	"github.com/dgrijalva/jwt-go/request"
 	"github.com/gorilla/schema"
+        "github.com/gorilla/mux"
+
 	"github.com/globbie/aide/pkg/knowdy"
 	"github.com/globbie/aide/pkg/mail"
 	"github.com/globbie/aide/pkg/session"
@@ -46,6 +51,11 @@ var (
 	VerifyKey *rsa.PublicKey
 	SignKey   *rsa.PrivateKey
 )
+
+type spaHandler struct {
+	staticPath string
+	indexPath  string
+}
 
 // todo(n.rodionov): write a separate function for each {} excess block
 func init() {
@@ -131,6 +141,38 @@ func init() {
 	}
 }
 
+func (h spaHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	// get the absolute path to prevent directory traversal
+	path, err := filepath.Abs(r.URL.Path)
+	if err != nil {
+		// if we failed to get the absolute path respond with a 400 bad request
+		// and stop
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	// prepend the path with the path to the static directory
+	path = filepath.Join(h.staticPath, path)
+
+	// check whether a file exists at the given path
+	_, err = os.Stat(path)
+	if os.IsNotExist(err) {
+		// log.Println("dynamic resource:" + path)
+
+		// file does not exist, serve index.html
+		http.ServeFile(w, r, filepath.Join(h.staticPath, h.indexPath))
+		return
+	} else if err != nil {
+		// if we got an error (that wasn't that the file doesn't exist) stating the
+		// file, return a 500 internal server error and stop
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	// otherwise, use http.FileServer to serve the static dir
+	http.FileServer(http.Dir(h.staticPath)).ServeHTTP(w, r)
+}
+
 func main() {
 	shard, err := knowdy.New(KndConfig, cfg.KnowdyAddress, cfg.KnowdyServiceName, cfg.LingProcAddress,
 		cfg.ServiceDomain, cfg.KnowdyShards, runtime.GOMAXPROCS(0))
@@ -144,14 +186,18 @@ func main() {
 		log.Fatalln("failed to create mail service, error:", e)
 	}
 
-	router := http.NewServeMux()
-	router.Handle("/", http.FileServer(http.Dir(cfg.StaticPath)))
+	router := mux.NewRouter()
 	router.Handle("/session", measurer(limiter(sessionHandler(shard),
 		cfg.RequestsMax, cfg.SlotAwaitDuration)))
-	router.Handle("/gsl", measurer(limiter(gslHandler(shard),
+	router.Handle("/query", measurer(limiter(queryHandler(shard),
 		cfg.RequestsMax, cfg.SlotAwaitDuration)))
+	router.Handle("/gsl", authorization(measurer(limiter(gslHandler(shard),
+		cfg.RequestsMax, cfg.SlotAwaitDuration))))
 	router.Handle("/msg", authorization(measurer(limiter(msgHandler(shard), cfg.RequestsMax, cfg.SlotAwaitDuration))))
 	router.Handle("/metrics", metricsHandler)
+
+	spa := spaHandler{staticPath: cfg.StaticPath, indexPath: "index.html"}
+	router.PathPrefix("/").Handler(spa)
 
 	server := &http.Server{
 		Handler:      logger(router),
@@ -174,7 +220,7 @@ func main() {
 
 		server.SetKeepAlivesEnabled(false)
 		if err := server.Shutdown(ctx); err != nil {
-			log.Fatalln("could not gracefully shutdown the server:", server.Addr)
+			log.Fatalln("failed to gracefully shutdown the server:", server.Addr)
 		}
 		close(done)
 	}()
@@ -184,7 +230,7 @@ func main() {
 
 	log.Println("AIDE server is ready to handle requests at ", hostname, " ",
 		cfg.ListenAddress, " Glottie service:", cfg.LingProcAddress,
-		" shards:", cfg.KnowdyShards)
+		" shards:", cfg.KnowdyShards, " static path:", cfg.StaticPath)
 
 	var msg = "AIDE server started at " + currentTime.String()
 	log.Println(msg, ms)
@@ -192,7 +238,7 @@ func main() {
 
 	err = server.ListenAndServe()
 	if err != nil && err != http.ErrServerClosed {
-		log.Fatalf("could not listen on %s, err: %v\n", server.Addr, err)
+		log.Fatalf("failed to listen on %s, err: %v\n", server.Addr, err)
 	}
 
 	<-done
@@ -306,6 +352,34 @@ func msgHandler(shard *knowdy.Shard) http.Handler {
 	})
 }
 
+func queryHandler(shard *knowdy.Shard) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodGet {
+			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+			return
+		}
+		w.Header().Set("Content-Type", "application/json")
+		gsl, ok := r.URL.Query()["gsl"]
+		if !ok || len(gsl) < 1 {
+			http.Error(w, "{\"error\":\"URL param gsl is missing\"}", http.StatusBadRequest)
+			return
+		}
+		buf := bytes.Buffer{}
+		buf.WriteString("{task{format JSON}{repo _")
+		buf.WriteString(gsl[0])
+		buf.WriteString("}}")
+
+		result, _, err := shard.RunTask(buf.String(), len(buf.String()))
+		if err != nil {
+			log.Println(result)
+			// TODO error status
+			http.Error(w, "{\"error\":\"" + result + "\"}", http.StatusBadRequest)
+			return
+		}
+		_, _ = io.WriteString(w, result)
+	})
+}
+	
 func sessionHandler(shard *knowdy.Shard) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.Method != http.MethodGet {

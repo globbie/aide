@@ -6,6 +6,8 @@ package knowdy
 //#cgo LDFLAGS: ${SRCDIR}/knowdy/build/libs/gsl-parser/lib/libgsl-parser_static.a
 //#include <knd_shard.h>
 //#include <knd_task.h>
+//#include <knd_output.h>
+//#include <knd_text.h>
 // static void kndShard_del__(struct kndShard *shard)
 // {
 //     if (shard) {
@@ -119,6 +121,7 @@ type Message struct {
 	Input     string              `schema:"t,required"`
 	Body      map[string]string   `json:"body,omitempty"`
 	Restate   map[string]string   `json:"restate,omitempty"`
+	Interp    *json.RawMessage    `json:"interp,omitempty"`
 	Resources []Resource          `json:"resources,omitempty"`
 	GeoTags   []GeoTag            `json:"geotags,omitempty"`
 	Quest     map[string]string   `json:"quest,omitempty"`
@@ -273,7 +276,8 @@ func (s *Shard) RunTask(task string, TaskLen int) (string, string, error) {
 
 	errCode := C.knd_task_run(worker, cs, C.size_t(TaskLen))
 	if errCode != C.int(0) {
-		return "", "", errors.New("task execution failed")
+		reply := C.GoStringN((*C.char)(worker.output), C.int(worker.output_size))
+		return reply, "", errors.New("task execution failed")
 	}
 
 	// check if we need to write to the authority node
@@ -312,7 +316,7 @@ func buildMsgReply(ses *session.ChatSession, tid string, ctx string, phase Scrip
 	log.Println(ses)
 	
 	reply := Message{nil, ctx, "stm", lang,
-		map[string]string{"en":"Reply"}, "", phase.Body, map[string]string{"en":"-- restate --"},
+		map[string]string{"en":"Reply"}, "", phase.Body, map[string]string{"en":"-- restate --"}, nil,
 		phase.Resources, phase.GeoTags, phase.Quest, phase.Menu}
 
 	b, _ := json.Marshal(reply)
@@ -343,10 +347,12 @@ func (s *Shard) CacheLookup(ses *session.ChatSession, ctx string, msg string, la
 }
 
 func (s *Shard) ProcessMsg(msg *Message) (string, error) {
-	if msg.Lang == "" {
-		msg.Lang = "en" // set default lang
-		if len(msg.ChatSession.Langs) > 0 {
-			msg.Lang = msg.ChatSession.Langs[0].String()
+	msg.Lang = "en" // default lang
+	if len(msg.ChatSession.Langs) > 0 {
+		msg.Lang = msg.ChatSession.Langs[0].String()
+		i := strings.Index(msg.Lang, "-")
+		if i != -1 {
+			msg.Lang = msg.Lang[:i]
 		}
 	}
 	reply, err := s.CacheLookup(msg.ChatSession, msg.Ctx, msg.Input, msg.Lang)
@@ -357,19 +363,31 @@ func (s *Shard) ProcessMsg(msg *Message) (string, error) {
 	if err != nil {
 		return "", errors.New("text decoding failed :: " + err.Error())
         }
-	msg.Body = make(map[string]string)
-	msg.Restate = make(map[string]string)
-	msg.Body[msg.Lang] = reply
-	msg.Restate[msg.Lang] = reply
+	// msg.Body = make(map[string]string)
+	// msg.Restate = make(map[string]string)
+	// msg.Body[msg.Lang] = reply
+	// msg.Restate[msg.Lang] = reply
 
+	{
+		json_interp_str, err := s.BuildJSON(reply, msg.Lang)
+		if err != nil {
+			return "", errors.New("JSON encoding failed :: " + err.Error())
+		}
+		log.Println(json_interp_str)
+		rawJSON := json.RawMessage(json_interp_str)
+		msg.Interp = &rawJSON
+	}
         // decide what action is needed
 	switch msg.Discourse {
 	case "stm":
-		return s.CommitStatement(msg)
+		break
+		// return s.CommitStatement(msg)
 	case "query":
-		return s.RunQuery(msg)
+		break
+		// return s.RunQuery(msg)
 	case "theme":
-		return s.CommitStatement(msg)
+		break
+		// return s.CommitStatement(msg)
 		// return s.RunQuery(msg)
 	default:
 		break
@@ -431,7 +449,6 @@ func (s *Shard) CreateChatSession(ses *session.ChatSession, signKey *rsa.Private
 		return "", nil, errors.New("failed to find a public peer shard")
 	}
 	ses.ShardId = si.Name
-	log.Println("== shard:", ses.ShardId)
 
 	gsl := bytes.Buffer{}
 	gsl.WriteString("{task {class User {!inst _")
@@ -493,4 +510,31 @@ func (s *Shard) CreateChatSession(ses *session.ChatSession, signKey *rsa.Private
 	// TODO: build initial greetings, menu options etc.
 	reply := "{\"sid\":\"" + token + "\",\"uid\":\"" + ses.UserId + "\"}"
 	return reply, cookies, nil
+}
+
+func (s *Shard) BuildJSON(Text string, Lang string) (string, error) {
+	worker := <-s.workers
+	defer func() { s.workers <- worker }()
+
+	var ctx C.struct_kndTaskContext
+	worker.ctx = &ctx
+	C.knd_task_reset(worker)
+
+	t := C.CString(Text)
+	defer C.free(unsafe.Pointer(t))
+
+	lang := C.CString(Lang)
+	defer C.free(unsafe.Pointer(lang))
+
+	ctx.locale_size = C.size_t(len(Lang))
+	C.memcpy(unsafe.Pointer(&ctx.locale[0]), unsafe.Pointer(lang), ctx.locale_size)
+
+	errCode := C.knd_text_build_JSON(t, C.size_t(len(Text)), worker)
+	if errCode != C.int(0) {
+		msg := C.GoStringN((*C.char)(worker.log.buf), C.int(worker.log.buf_size))
+		log.Println(msg)
+		return "", errors.New("JSON text build failed")
+	}
+
+	return C.GoStringN((*C.char)(worker.output), C.int(worker.output_size)), nil
 }

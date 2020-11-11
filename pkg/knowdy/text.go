@@ -55,6 +55,7 @@ func (s *Shard) EncodeText(graph string, lang string) (string, error) {
 	return string(body), nil
 }
 
+
 /*
 pass phrase generation
 

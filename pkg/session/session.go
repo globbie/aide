@@ -56,6 +56,7 @@ func BuildSessionCookie(name string, val string, domain string) (*http.Cookie, e
 	}
 	cookie.Expires = time.Now().Add(356 * 24 * time.Hour)
 	cookie.HttpOnly = true
+	cookie.SameSite = http.SameSiteStrictMode
 	return &cookie, nil
 }
 
