@@ -1,4 +1,4 @@
-FROM alpine:3.8 as builder
+FROM alpine:3.12 as builder
 RUN apk --update add \
     go \
     dep \
@@ -30,9 +30,16 @@ RUN cp aide /tmp
 FROM scratch
 
 WORKDIR /etc/aide
-COPY ./examples /etc/aide
+COPY ./etc /etc/aide
+
 WORKDIR /etc/knowdy/schemas
 COPY ./schemas /etc/knowdy/schemas
+
+WORKDIR /var/www/html
+COPY ./static /var/www/html
+
+WORKDIR /var/lib/knowdy/db/knd-base/snapshot_0
+COPY ./db .
 
 COPY --from=builder /tmp/aide /
 

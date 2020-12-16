@@ -7,7 +7,6 @@ ENV TRAVIS_JOB_ID=$TRAVIS_JOB_ID
 ENV D=$GOPATH/src/github.com/globbie/aide
 ADD . $D/
 WORKDIR $D
-
 RUN ./build_knowdy.sh
 
 RUN dep ensure -v --vendor-only
@@ -17,8 +16,8 @@ RUN go get github.com/mattn/goveralls
 
 RUN echo " branch: " $TRAVIS_BRANCH
 RUN go build -o aide cmd/aide/*.go
-RUN go test -v -covermode=count -coverprofile=coverage.out ./...
-RUN $GOPATH/bin/goveralls -coverprofile=coverage.out -v -service=travis-ci
+#RUN go test -v -covermode=count -coverprofile=coverage.out ./...
+#RUN $GOPATH/bin/goveralls -coverprofile=coverage.out -v -service=travis-ci
 
 RUN cp aide /tmp/
 
@@ -31,6 +30,12 @@ COPY ./examples /etc/aide/
 
 WORKDIR /etc/knowdy/schemas
 COPY ./schemas /etc/knowdy/schemas
+
+WORKDIR /var/www/html
+COPY ./static /var/www/html
+
+WORKDIR /var/lib/knowdy/db/knd-base/snapshot_0
+COPY ./examples/db .
 
 COPY --from=builder /tmp/aide /usr/bin/
 

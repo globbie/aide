@@ -15,7 +15,9 @@ import (
 	"os/signal"
 	"path/filepath"
 	"runtime"
+	"strings"
 	"time"
+	"golang.org/x/text/language"
 
 	"github.com/dgrijalva/jwt-go"
 	"github.com/dgrijalva/jwt-go/request"
@@ -72,7 +74,7 @@ func init() {
 	flag.StringVar(&configPath,    "config-path", "/etc/aide/aide.json", "path to AIDE config")
 	flag.StringVar(&kndConfigPath, "knd-config-path", "/etc/aide/shard.gsl", "path to Knowdy config")
 	flag.StringVar(&listenAddress, "listen-address", "", "AIDE listen address")
-	flag.StringVar(&staticPath,    "static-path", "/usr/local/var/www", "path to static content")
+	flag.StringVar(&staticPath,    "static-path", "", "path to static content")
 	flag.StringVar(&lingAddress,   "ling-address", "", "Glottie ling proc address")
 	flag.IntVar(&requestsMax,      "requests-limit", 10, "max number of requests to process simultaneously")
 	flag.DurationVar(&duration, "request-limit-duration", 1*time.Second, "free slot awaiting time")
@@ -364,15 +366,28 @@ func queryHandler(shard *knowdy.Shard) http.Handler {
 			http.Error(w, "{\"error\":\"URL param gsl is missing\"}", http.StatusBadRequest)
 			return
 		}
+		lang := "en"
+		var Langs []language.Tag
+		Langs, _, _ = language.ParseAcceptLanguage(r.Header.Get("Accept-Language"))
+		if len(Langs) > 0 {
+			lang = Langs[0].String()
+			i := strings.Index(lang, "-")
+			if i != -1 {
+				lang = lang[:i]
+			}
+		}
 		buf := bytes.Buffer{}
-		buf.WriteString("{task{format JSON}{repo _")
+		// TODO graph expand depth option
+		buf.WriteString("{task{format JSON}")
+		buf.WriteString("{locale " + lang + "}")
+		buf.WriteString("{repo ~")
 		buf.WriteString(gsl[0])
 		buf.WriteString("}}")
 
 		result, _, err := shard.RunTask(buf.String(), len(buf.String()))
 		if err != nil {
 			log.Println(result)
-			// TODO error status
+			// TODO set error status
 			http.Error(w, "{\"error\":\"" + result + "\"}", http.StatusBadRequest)
 			return
 		}

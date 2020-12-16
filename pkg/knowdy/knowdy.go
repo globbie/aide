@@ -25,6 +25,7 @@ import (
 	"log"
 	"net/http"
 	"net/url"
+	"os"
 	"strings"
 	"time"
 	"unsafe"
@@ -200,7 +201,9 @@ func taskTypeToStr(v C.int) string {
 func (s *Shard) PopulateScriptCache(Filename string) (error) {
 	CacheBytes, err := ioutil.ReadFile(Filename)
 	if err != nil {
-		// log.Println("JSON DB: ", err.Error())
+		if os.IsNotExist(err) {
+			return nil
+		}
 		return errors.New("failed to read json db cache")
 	}
 	err = json.Unmarshal(CacheBytes, &s.Scripts)
@@ -215,19 +218,25 @@ func (s *Shard) PopulateScriptCache(Filename string) (error) {
 }
 
 func (s *Shard) PopulateMsgCache(Filename string) (error) {
+	s.MsgIdx = make(map[string][]MsgInterp)
+
+	// if _, err := os.Stat(Filename); os.IsNotExist(err) {
+	//		return nil
+	// }
+
 	CacheBytes, err := ioutil.ReadFile(Filename)
 	if err != nil {
-		log.Println("JSON Msg DB: ", err.Error())
+		if os.IsNotExist(err) {
+			return nil
+		}
 		return errors.New("failed to read json msg cache")
 	}
-	log.Println("Msg DB: ", string(CacheBytes))
+
 	err = json.Unmarshal(CacheBytes, &s.LangCaches)
 	if err != nil {
-		log.Println("Unmarshal: ", err.Error())
+		log.Println("Unmarshalling JSON Msg DB failed: ", err.Error())
 		return errors.New("failed to parse json msg cache")
 	}
-
-	s.MsgIdx = make(map[string][]MsgInterp)
 
 	for _, lc := range s.LangCaches {
 		for _, ctx := range lc.ScriptCtxs {
@@ -235,20 +244,6 @@ func (s *Shard) PopulateMsgCache(Filename string) (error) {
 				for _, trig := range react.Triggers {
 					s.RegisterMsg(trig, react, ctx)
 				}}}}
-
-	/*for key, interps := range s.MsgIdx {
-		log.Println("Msg: ", key, " val:", interps)
-		if key == strings.ToUpper("Where do I start") {
-			for _, interp := range interps {
-				log.Println("Ctx: ", interp.ScriptCtx.Id, " React:", interp.ScriptReact.Id)
-				
-			}
-		}
-	}*/
-
-	// reply, _ := s.CacheLookup("123", "init", "Where do I start", "en")
-	// log.Println("Reply: ", reply)
-	
 	return nil
 }
 
@@ -274,9 +269,10 @@ func (s *Shard) RunTask(task string, TaskLen int) (string, string, error) {
 	cs := C.CString(task)
 	defer C.free(unsafe.Pointer(cs))
 
+	log.Println("** running task: ", task)
 	errCode := C.knd_task_run(worker, cs, C.size_t(TaskLen))
+	reply := C.GoStringN((*C.char)(worker.output), C.int(worker.output_size))
 	if errCode != C.int(0) {
-		reply := C.GoStringN((*C.char)(worker.output), C.int(worker.output_size))
 		return reply, "", errors.New("task execution failed")
 	}
 
@@ -286,7 +282,7 @@ func (s *Shard) RunTask(task string, TaskLen int) (string, string, error) {
 		reply, err := s.ApplyCommit(s.KnowdyServiceName, C.GoStringN((*C.char)(worker.output), C.int(worker.output_size)))
 		return reply, "commit", err
 	default:
-		return C.GoStringN((*C.char)(worker.output), C.int(worker.output_size)), taskTypeToStr(C.int(0)), nil
+		return reply, taskTypeToStr(C.int(0)), nil
 	}
 }
 
@@ -363,10 +359,6 @@ func (s *Shard) ProcessMsg(msg *Message) (string, error) {
 	if err != nil {
 		return "", errors.New("text decoding failed :: " + err.Error())
         }
-	// msg.Body = make(map[string]string)
-	// msg.Restate = make(map[string]string)
-	// msg.Body[msg.Lang] = reply
-	// msg.Restate[msg.Lang] = reply
 
 	{
 		json_interp_str, err := s.BuildJSON(reply, msg.Lang)
