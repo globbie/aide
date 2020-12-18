@@ -1,40 +1,42 @@
 {schema knd-basic
 
-{!class Spatial Position
+{!class Spatial Location
     [_gloss {ru {t пространственное положение}}]
-    {is Abstraction}
-}
+    {is Abstraction}}
 
-{!class Quantity
-    [_gloss {ru {t количественная характеристика объекта}}]
-    {is Abstraction}
-}
+{!class 3D Spatial Location
+    [_gloss {ru {t локализация физического тела в пространстве}}]
+    {is Spatial Location}
+    {ref origin {c 3D Spatial Location}}
+    {num x}
+    {num y}
+    {num z}}
 
 {!class Substance Quantity
     [_gloss {ru {t количественная характеристика вещества}}]
     {is Quantity}
-    {!num mass}
-    {!ref unitref {!c Mass Measure Unit}}}
+    {num mass}
+    {ref unitref {c Mass Measure Unit}}}
 
 {!class Countable Quantity
     [_gloss {ru {t количественная характеристика счетных объектов}}]
     {is Quantity}
-    {!num count} }
+    {num count} }
 
 {!class Physical Mass Quantity
     [_gloss {ru {t масса физического тела}}]
     {is Abstraction}
-    {!str calc}
-    {-- !ref measure-proc {c Mass Measurement Procedure} --}
-    {!num mass {!impl}}
-    {!num count}
-    {!str unit}
-    {!ref unitref {!c Mass Measure Unit}}}
+    {str calc}
+    {-- ref measure-proc {c Mass Measurement Procedure} --}
+    {num mass {impl}}
+    {num count}
+    {str unit}
+    {ref unitref {c Mass Measure Unit}}}
 
-{-- {!proc Compute Physical Mass
+{-- {proc Compute Physical Mass
     [_gloss {ru {t расчет физической массы объекта}}]
     {result {c Substance Quantity}}
-    [!arg {obj  {c Physical Object}}
+    [arg {obj  {c Physical Object}}
           {q    {c Quantity}}]
     {switch q
             {base Substance Quantity
@@ -57,12 +59,5 @@
     [_gloss {ru {t литр}}]
     {is Mass Measure Unit}}
 
-{!class Spatial Location
-    [_gloss {ru {t локализация физического тела в пространстве}}]
-    {is Abstraction}
-    {!ref origin {c Physical Object}}
-    {str x}
-    {str y}
-    {str z}}
 
 }

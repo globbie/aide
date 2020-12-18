@@ -7,19 +7,28 @@
        [_gloss {ru {t естественный процесс}}]
        {is Process}}
 
+   {!proc Motion
+      [_gloss {ru {t перемещение физического объекта в пространстве}}]
+      {is Process}
+      [arg {Obj       {_c Physical Object}}
+           {TargetLoc {_c Spatial Location}} ]
+      [do {_move
+             {obj      TObj}
+             {where-to TargetLoc}} ]}
+
    {!proc Agent Driven Process
       [_gloss {ru {t агентивный процесс}}]
       {is Process}
       [arg {agent {_c Agent}}]}
 
    {!proc Transportation Process
-      [_gloss {ru {t процесс перемещения физического объекта}}]
-      {is Agent Driven Process}
+      [_gloss {ru {t процесс активного перемещения физического объекта}}]
+      {is  Physical Impact Process}
       [arg {Obj       {_c Physical Object}}
-           {TargetLoc {_c Spatial Position} }]
+           {TargetLoc {_c Spatial Location}} ]
       [do {_move
              {obj      TObj}
-             {where-to TargetLoc}}] }
+             {where-to TargetLoc}} ]}
 
    {!proc Physical Impact Process
       [_gloss {ru {t процесс физического воздействия на объект}}]
@@ -78,12 +87,6 @@
    {!proc speak
        [_gloss {ru {t говорить}}]
        {is Agent Driven Process}}
-
-{--
-                     {do fill Container
-                            {substance {c Potable Water}}
-                            {container kettle}}}]
---}
 
 
 }

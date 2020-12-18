@@ -1,39 +1,39 @@
 {schema knd-basic
 
 {!class Physical Structure
-     [!_gloss {ru {t материальное сооружение}}]
+     [_gloss {ru {t материальное сооружение}}]
      {is Material Product}
      {is Spatial Object}}
 
 {!class Building
-    [!_gloss {ru {t здание}}]
+    [_gloss {ru {t здание}}]
     {is Physical Structure
         {purpose Shelter}}
     {inner floor {c Building Floor}}
     {str addr}}
 
 {!class Building Floor
-    [!_gloss {ru {t этаж здания}}]
+    [_gloss {ru {t этаж здания}}]
     {inner space {c Building Space}}
     {str floor-id}}
 
 {!class Building Space
-    [!_gloss {ru {t помещение}}]
+    [_gloss {ru {t помещение}}]
     {str space-id}}
 
 {!class Office Space
-    [!_gloss {ru {t офисное помещение}}]
+    [_gloss {ru {t офисное помещение}}]
     {is Building Space}
     {-- owner/renter: single company --}
     {inner room {c Office Room}}
     {str office-id}}
 
 {!class Storage Space
-    [!_gloss {ru {t складское помещение}}]
+    [_gloss {ru {t складское помещение}}]
     {is Building Space}}
 
 {!class Office Room
-    [!_gloss {ru {t кабинет офиса}}]
+    [_gloss {ru {t кабинет офиса}}]
     {is Physical Structure}
     {str room-id}}
 

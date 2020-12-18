@@ -2,8 +2,7 @@
 
 {!class Spatial Object
   [_gloss {ru {t пространственный объект}}]
-  {is Abstraction}
-}
+  {is Abstraction}}
 
 {!class Geographical Region
     [_gloss {ru {t географический регион}}]

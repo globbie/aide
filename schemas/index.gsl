@@ -1,27 +1,30 @@
 {include person}
 
-{include taste}
-{include color}
-
-{include food}
-
-{include geo}
-{include lang}
+{-- abstract --}
 {include quant}
 {include time}
 {include physics}
 {include geometry}
+
+{-- sensors --}
+{include taste}
+{include color}
+
+{-- objects --}
+{include nature}
+{include geo}
+{include food}
 {include building}
-{include network}
-{include communication}
+{include toys}
 
 {-- include device --}
 
+{-- information --}
+{include lang}
+{include network}
+{include communication}
 
 {include proc}
-{--include plan--}
-
-{-- include glottie/index --}
 
 {schema knd-basic
 
@@ -48,10 +51,10 @@
 
 {!class Physical Object
     [_gloss {ru {t физический объект}}]
-    {is Object}
-    {!inner location {c Spatial Location}}
-    {ref color {c Color}}
-    {!str img {!concise 1}}}
+    {is     Object}
+    {inner  location {c Spatial Location}}
+    {ref    color    {c Color}}
+    {str    img      {concise 1}}}
 
 {!class Information
     [_gloss {ru {t информация}}]
@@ -72,7 +75,7 @@
 {!class Collection
     [_gloss {ru {t множество}}]
     {is Abstraction}
-    {!ref unit-type {c Object}}}
+    {ref unit-type {c Object}}}
 
 {!class Custom Class
     [_gloss {ru {t класс с произвольной семантикой}}]
@@ -103,9 +106,9 @@
 
 {!class Product of Labor
     [_gloss {ru {t продукт труда}}]
-    [!_summary {ru {t результат целенаправленной деятельности Агента,
-                      пригодный для решения какой-либо задачи}}]
-    {!str purpose}}
+    {-- [_summary {ru {t результат целенаправленной деятельности Агента,
+                      пригодный для решения какой-либо задачи}}] --}
+    {str purpose}}
 
 {!class Material Product
     [_gloss {ru {t изделие}}]
@@ -128,7 +131,7 @@
     {is Group}}
 
 {!class    Sensory Object
-[_gloss    {ru {t объект восприятия}}]
+    [_gloss    {ru {t объект восприятия}}]
     {is    Object}}
 
 {!class    Agent
@@ -141,10 +144,9 @@
     {is    Abstraction}}
 
 {!class Encoded Data
-    [_gloss {ru {t кодированная информация}}]
-    {is Information}
-    {str mimetype}
-    {bool is-binary}
-    {!cdata body}}
-
+        [_gloss {ru {t кодированная информация}}]
+        {is     Information}
+        {str    mimetype}
+        {bool   is-binary}
+        {cdata  body}}
 }

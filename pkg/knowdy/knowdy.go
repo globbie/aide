@@ -269,7 +269,7 @@ func (s *Shard) RunTask(task string, TaskLen int) (string, string, error) {
 	cs := C.CString(task)
 	defer C.free(unsafe.Pointer(cs))
 
-	log.Println("** running task: ", task)
+	log.Println(">> running task: ", task)
 	errCode := C.knd_task_run(worker, cs, C.size_t(TaskLen))
 	reply := C.GoStringN((*C.char)(worker.output), C.int(worker.output_size))
 	if errCode != C.int(0) {

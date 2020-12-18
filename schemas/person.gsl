@@ -1,18 +1,23 @@
 {schema knd
 
+{!class Human
+    [_gloss {ru {t человек}}]
+    {is Animal Organism}
+    {is Agent}
+    {inner biometrics {c Personal Biometrics}}}
+
 {!class User
     [_gloss {ru {t пользователь сервиса}}]
     {is Agent}
-    {inner contacts {!c User Contacts}}
-    {inner ident {!c User Ident}}
-    {-- !inner role {!c User Role} {!t set {!uniq service}} --}
-    {inner biometrics {!c Personal Biometrics}}}
+    {inner contacts   {c User Contacts}}
+    {inner ident      {c User Ident}}
+    {-- inner role    {c User Role} {t set {uniq service}} --} }
 
 {!class User Ident
     [_gloss {ru {t идентификация пользователя}}]
     {is Information}
     {inner cred   {c User Credentials} {t set}}
-    {inner gender {c Gender}}
+    {ref   gender {c Gender}}
     {inner name   {c Personal Name}}}
 
 {!class User Credentials
@@ -76,7 +81,7 @@
     {num age}
     {---    {proc
               {do _subtract}} ---}
-    {!ref sex {c Sex}}}
+    {ref sex {c Sex}}}
 
 {!class User Contacts
     [_gloss {ru {t контактные данные пользователя}}]

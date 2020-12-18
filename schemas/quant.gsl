@@ -1,15 +1,19 @@
 {schema knd-basic
 
+{!class Quantity
+[_gloss {ru {t количественная характеристика объекта}}]
+    {is Abstraction}}
+
 {--{!class nn42
    {_c {nn10
-           {mult nn4}}
-        {add nn2}}
+           {_mult nn4}}
+        {_add nn2}}
 }
 --}
 
 {!class Number
     [_gloss {ru {t число}}]
-    {is Abstraction}}
+    {is Quantity}}
 
 {!class Number Zero
     [_gloss {ru {t число 0}}]

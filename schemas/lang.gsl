@@ -8,7 +8,7 @@
     {-- inner ident {c Language Identity} --}
     {inner code {c Language Id Code} {t set}}}
 
-{-- !class Language Identity
+{-- class Language Identity
     {is Information}
     {inner code {c Language Id Code} {t set}} --}
 
@@ -26,25 +26,25 @@
     {str name}}
 
 {!class Chinese Language
-    [!_gloss {ru {t китайский}}
+    [_gloss {ru {t китайский}}
              {en {t Chinese}}]
     {is Natural Language
         [code {ISO 639-1 {name zh}}] }}
 
 {!class English Language
-    [!_gloss {ru {t английский}}
+    [_gloss {ru {t английский}}
              {en {t English}} ]
     {is Natural Language
         [code {ISO 639-1 {name en}}] }}
 
 {!class French Language
-    [!_gloss {ru {t французский}}
+    [_gloss {ru {t французский}}
              {en {t French}}]
     {is Natural Language
         [code {ISO 639-1 {name fr}}] }}
 
 {!class Russian Language
-    [!_gloss {ru {t русский}}
+    [_gloss {ru {t русский}}
             {en {t Russian}}]
     {is Natural Language
         [code {ISO 639-1 {name ru}}] }}
